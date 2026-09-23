@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chip music project v1",
+  "type": "object",
+  "required": [
+    "format",
+    "version",
+    "title",
+    "bpm",
+    "ppq",
+    "bars",
+    "hz",
+    "loop",
+    "loopStart",
+    "opllPatch",
+    "tracks"
+  ],
+  "properties": {
+    "format": {
+      "const": "msx-music-studio"
+    },
+    "version": {
+      "const": 1
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "bpm": {
+      "type": "integer",
+      "minimum": 40,
+      "maximum": 300
+    },
+    "ppq": {
+      "const": 96
+    },
+    "bars": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64
+    },
+    "hz": {
+      "enum": [
+        50,
+        60
+      ]
+    },
+    "loop": {
+      "type": "boolean"
+    },
+    "loopStart": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 24575
+    },
+    "opllPatch": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "chip",
+          "channel",
+          "instrument",
+          "wave",
+          "mute",
+          "notes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "chip": {
+            "enum": [
+              "PSG",
+              "OPLL",
+              "SCC"
+            ]
+          },
+          "channel": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8
+          },
+          "instrument": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 15
+          },
+          "wave": {
+            "type": "array",
+            "minItems": 32,
+            "maxItems": 32,
+            "items": {
+              "type": "integer",
+              "minimum": -128,
+              "maximum": 127
+            }
+          },
+          "mute": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "pitch",
+                "start",
+                "duration",
+                "velocity"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "pitch": {
+                  "type": "integer",
+                  "minimum": 24,
+                  "maximum": 95
+                },
+                "start": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 24575
+                },
+                "duration": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 24576
+                },
+                "velocity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 15
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.exe binary
+*.png binary
+*.gif binary
+vendor/** -text -whitespace
+licenses/** -text -whitespace
