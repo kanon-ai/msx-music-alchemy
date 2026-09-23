@@ -1,4 +1,4 @@
-# MSX Music Alchemy v0.1.0
+# MSX Music Alchemy v0.2.0
 
 **Turn ideas into chip music.** A local-first PSG / OPLL / SCC music editor with a piano roll,
 step entry, game-ready data exports, and an MCP server for AI-assisted composition.
@@ -36,6 +36,9 @@ Python不要のWindows版はReleasesのZIPを展開し、`MSXMusicAlchemy.exe` �
 
 ゲーム開発パックZIP: 編集JSON、schema、レジスタJSON、Cヘッダー、バイナリ、
 VGM、C89スケジューラー、AI向け説明、組み込みガイド。WAVも個別出力できます。
+「MGSDRV (.mgs)」で、PSG 3＋SCC 5＋FM 9パートを実機プレイヤー向けに出力できます。
+60 Hz・最大16 KiB（バイナリ部分）。カスタムFM音色、SCC波形、ループに対応します。
+使用方法と検証範囲は [MGSDRV出力](docs/MGSDRV_EXPORT.md)。
 muteは出力に反映します。soloは試聴だけに適用し、出力には反映しません。
 MCPは [MCP_SETUP.md](MCP_SETUP.md)、ゲームへの導入は [GAME_INTEGRATION.md](docs/GAME_INTEGRATION.md)。
 
@@ -53,7 +56,8 @@ PSGは矩形波トーン。ノイズ／ハード・ソフトエンベロープ�
 OPLLは9音メロディ。リズムモードは未対応。音色はトラック内で固定。
 SCCは標準SCC（4/5ch波形共有）。SCC+専用モードは未対応。
 テンポ・拍子は曲内固定。MMLの高度なマクロ、LFOなどは未対応。
-MGSコンパイル、MIDI機器入力、実チップ出力、ROM自動生成は含みません。
+汎用MMLからのMGSコンパイル、MIDI機器入力、実チップ出力、ROM自動生成は含みません。
+MGSは編集データから直接生成します。MGSDRV本体・実機プレイヤーは別途必要です。
 試聴は音源エミュレーションであり、MSX実機の動作確認とは別です。
 
 ## 開発・検証

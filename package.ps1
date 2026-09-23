@@ -7,5 +7,5 @@ if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
 Copy-Item -LiteralPath README.md,MCP_SETUP.md,THIRD_PARTY.md,LICENSE,DISCLAIMER.md -Destination dist/MSXMusicAlchemy
 Copy-Item -LiteralPath docs -Destination dist/MSXMusicAlchemy/docs -Recurse -Force
 New-Item -ItemType Directory -Path releases -Force | Out-Null
-Compress-Archive -Path dist/MSXMusicAlchemy -DestinationPath releases/MSXMusicAlchemy-v0.1.0-windows-x64.zip -Force
-Get-FileHash releases/MSXMusicAlchemy-v0.1.0-windows-x64.zip -Algorithm SHA256
+Compress-Archive -Path dist/MSXMusicAlchemy -DestinationPath releases/MSXMusicAlchemy-v0.2.0-windows-x64.zip -Force
+Get-FileHash releases/MSXMusicAlchemy-v0.2.0-windows-x64.zip -Algorithm SHA256

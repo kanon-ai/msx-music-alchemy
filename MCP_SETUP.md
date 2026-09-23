@@ -34,7 +34,7 @@ MCPはローカルエディタを操作するので、リモートのクラウ�
 | set_track_notes | 指定トラックだけノートを変更 |
 | import_mml | MGSC基本構文を解析してJSONを返す |
 | validate_song | 音域、単音、フレーム、SCC波形共有などを検証 |
-| export_song | outputsフォルダにJSON/WAV/VGM/C/ZIP等を新規保存 |
+| export_song | outputsフォルダにJSON/WAV/VGM/MGS/C/ZIP等を新規保存 |
 
 AIへの指示例:
 

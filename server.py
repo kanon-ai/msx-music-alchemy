@@ -10,6 +10,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 import core
+from mgs import export_mgs
 from mml import import_mml
 
 DATA=Path(os.environ.get('MSX_MUSIC_DATA',str(Path(__file__).resolve().parent/'data')))
@@ -44,7 +45,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed(): return self.reply(dict(error='Local access only'),403)
         route=urlparse(self.path).path
         if route=='/api/state': return self.reply(self.server.store.get())
-        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.1.0',token=self.server.token,patches=core.PATCH_NAMES))
+        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.2.0',token=self.server.token,patches=core.PATCH_NAMES))
         if route=='/api/new': return self.reply(core.new_song())
         if route=='/api/demo': return self.reply(core.demo_song())
         allowed={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}
@@ -70,6 +71,7 @@ class Handler(BaseHTTPRequestHandler):
                 elif fmt=='registers': result=json.dumps(core.compile_song(p),indent=2).encode(); kind='application/json'
                 elif fmt=='header': result=core.header(p).encode(); kind='text/plain'
                 elif fmt=='vgm': result=core.vgm(p); kind='application/octet-stream'
+                elif fmt=='mgs': result=export_mgs(p); kind='application/octet-stream'
                 elif fmt=='bundle': result=core.bundle(p); kind='application/zip'
                 elif fmt=='wav': result=core.render(p); kind='audio/wav'
                 else: raise ValueError('未対応の出力形式です。')

@@ -36,5 +36,11 @@ dotted lengths, % raw lengths (MGSC PPQ 48, doubled into this project's PPQ 96),
 Default volume follows MGSC (v0), so include v explicitly. Only an initial constant t is
 accepted. No macros, slurs, LFO, envelopes, rhythm mode, raw register commands, infinite
 loops, intermediate instrument changes or alternate endings. Unsupported syntax fails
-atomically. JSON is the lossless exchange format; MML export and MGS binary compilation
-are not implemented.
+atomically. JSON is the lossless exchange format; MML text export is not implemented.
+
+`export_song` format `mgs` exports the editor song directly as MGSDRV v3 data using
+frame-duration commands (MGS303). Supports all 17 channels, the shared custom OPLL
+patch, SCC waves, mute and nonzero loop starts. Requires 60 Hz and at most 16 KiB
+of binary data; unsupported/oversize songs fail explicitly without truncation.
+MSX playback needs MGSDRV and a compatible player, supplied separately. Driver
+tuning and hardware mix levels can differ from the editor. See MGSDRV_EXPORT.md.

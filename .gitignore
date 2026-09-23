@@ -6,3 +6,5 @@ dist/
 test-results/
 *.spec
 releases/
+saved-performances/
+tmp/

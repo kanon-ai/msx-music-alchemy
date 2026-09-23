@@ -4,6 +4,8 @@ const colors={PSG:'#81b4de',OPLL:'#a5b3d6',SCC:'#89b4c4'}, names=['C','C♯','D'
 const noteName=n=>names[((n%12)+12)%12]+(Math.floor(n/12)-1);
 let song,revision=0,token='',trackIndex=0,selected=null,page=0,grid=24,topPitch=83,view='roll',solo=null;
 let undo=[],redo=[],saveTimer=null,dirty=false,saving=false,conflict=false,drag=null,epoch=0;
+let masterGain=null,previewBoost=1;
+let stepRows=[],stepFollowRow=null;
 let audioContext=null,source=null,playing=false,playStart=0,playOffset=0,renderId=0;
 const track=()=>song.tracks[trackIndex], end=()=>song.bars*384;
 const status=(message,error=false)=>{ $('status').textContent=message; $('status').classList.toggle('error',error); };
@@ -81,10 +83,31 @@ function drawStep(){
  $('step-keys').replaceChildren();for(let i=0;i<13;i++){
   const p=topPitch-23+i;const b=document.createElement('button');b.textContent=noteName(p);if([1,3,6,8,10].includes(p%12))b.className='black';b.onclick=()=>stepNote(p);$('step-keys').append(b);
  }
- $('step-table').replaceChildren();for(const n of track().notes){
+ stepRows=[];stepFollowRow=null;
+ $('step-table').replaceChildren();for(const n of [...track().notes].sort((a,b)=>a.start-b.start)){
   const row=document.createElement('tr');row.classList.toggle('selected',n.id===selected);for(const value of [`${Math.floor(n.start/384)+1}:${Math.floor(n.start%384/96)+1}`,noteName(n.pitch),n.start,n.duration,n.velocity]){const td=document.createElement('td');td.textContent=value;row.append(td);}
+  stepRows.push({note:n,row});
   row.onclick=()=>{selected=n.id;$('step-cursor').value=n.start;page=Math.floor(n.start/384);draw();};$('step-table').append(row);
  }
+}
+function stepPlaybackIndex(notes,tick){
+ return notes.findIndex(n=>n.start<=tick&&tick<n.start+n.duration);
+}
+function followStep(tick){
+ const active=stepPlaybackIndex(stepRows.map(x=>x.note),tick);
+ for(let i=0;i<stepRows.length;i++)stepRows[i].row.classList.toggle('playing-note',i===active);
+ $('step-play-position').textContent=`再生位置 ${Math.floor(tick/384)+1}:${Math.floor(tick%384/96)+1} · ${Math.floor(tick)} tick`;
+ const next=active>=0?active:stepRows.findIndex(x=>x.note.start>tick);
+ const row=stepRows[next]?.row;
+ if(row&&row!==stepFollowRow){
+  stepFollowRow=row;
+  const wrap=$('step-table').closest('.step-table-wrap'),r=row.getBoundingClientRect(),w=wrap.getBoundingClientRect();
+  if(r.top<w.top+30||r.bottom>w.bottom)wrap.scrollTop+=r.top-w.top-wrap.clientHeight/2;
+ }
+}
+function clearStepPlayback(){
+ for(const x of stepRows)x.row.classList.remove('playing-note');
+ stepFollowRow=null;$('step-play-position').textContent='停止中';
 }
 function draw(){
  page=Math.min(page,song.bars-1);refreshInputs();drawTracks();drawOverview();drawRoll();drawInspector();if(view==='step')drawStep();
@@ -109,14 +132,33 @@ window.addEventListener('pointerup',()=>{if(!drag)return;const d=drag;drag=null;
 function stepNote(pitch){let cursor=+$('step-cursor').value;const existing=track().notes.find(n=>n.start===cursor);if(existing){const n={...existing,pitch};edit(()=>{Object.assign(existing,n);selected=n.id;});$('step-cursor').value=Math.min(end()-1,cursor+ +$('length').value);}else if(insert(pitch,cursor))$('step-cursor').value=Math.min(end()-1,cursor+ +$('length').value);}
 function deleteSelected(){if(!selected)return;edit(()=>{track().notes=track().notes.filter(n=>n.id!==selected);selected=null;});}
 function history(direction){const a=direction==='undo'?undo:redo,b=direction==='undo'?redo:undo;if(!a.length)return;b.push(snapshot());song=JSON.parse(a.pop());selected=null;changed();}
-function stop(){const wasPlaying=playing;renderId++;playing=false;if(source){try{source.stop();}catch{}source=null;}$('play').textContent='▶';$('play').disabled=false;$('playhead').style.display='none';$('time').textContent='001 : 01';if(wasPlaying)status('停止しました。');}
+function stop(){clearStepPlayback();const wasPlaying=playing;renderId++;playing=false;if(source){try{source.stop();}catch{}source=null;}$('play').textContent='▶';$('play').disabled=false;$('playhead').style.display='none';$('time').textContent='001 : 01';if(wasPlaying)status('停止しました。');}
+function previewGain(buffer){
+ let peak=0;
+ for(let ch=0;ch<buffer.numberOfChannels;ch++){
+  const data=buffer.getChannelData(ch);
+  for(let i=0;i<data.length;i++)peak=Math.max(peak,Math.abs(data[i]));
+ }
+ // One constant gain for the entire performance preserves phrasing and dynamics.
+ // Leave 1 dB sample-peak headroom and cap boost at about 18 dB.
+ return peak>0?Math.min(8,Math.pow(10,-1/20)/peak):1;
+}
+function updateMaster(){
+ const value=Number($('master-volume').value)/100;
+ $('master-value').textContent=Math.round(value*100)+'%';
+ if(masterGain)masterGain.gain.setTargetAtTime(previewBoost*value,audioContext.currentTime,.025);
+}
 async function play(){
  if(playing){stop();return;}const id=++renderId;
  audioContext??=new AudioContext();await audioContext.resume();$('play').disabled=true;status('音源をレンダリングしています…');
  try{
   const p=clone(song);if(solo!==null)p.tracks.forEach((t,i)=>t.mute=i!==solo);
   const response=await api('/api/render',{song:p});const buffer=await audioContext.decodeAudioData(await response.arrayBuffer());if(id!==renderId)return;
-  source=audioContext.createBufferSource();source.buffer=buffer;source.connect(audioContext.destination);source.loop=p.loop;
+  previewBoost=previewGain(buffer);
+  if(!masterGain){masterGain=audioContext.createGain();masterGain.connect(audioContext.destination);}
+  masterGain.gain.cancelScheduledValues(audioContext.currentTime);
+  masterGain.gain.setValueAtTime(previewBoost*Number($('master-volume').value)/100,audioContext.currentTime);
+  source=audioContext.createBufferSource();source.buffer=buffer;source.connect(masterGain);source.loop=p.loop;
   source.loopStart=Math.round(p.loopStart/96*60/p.bpm*p.hz)/p.hz;source.loopEnd=Math.round(p.bars*4*60/p.bpm*p.hz)/p.hz;
   playStart=audioContext.currentTime;playOffset=page*4*60/p.bpm;source.start(0,playOffset);playing=true;$('play').textContent='Ⅱ';status('再生中 · PSG / OPLL / SCC エミュレーション');
   source.onended=()=>{if(playing&&!p.loop)stop();};requestAnimationFrame(animate);
@@ -127,10 +169,10 @@ function animate(){
  if(song.loop&&secs>=total){const begin=song.loopStart/96*60/song.bpm;secs=begin+(secs-total)%(total-begin);}
  const tick=secs*song.bpm/60*96;const bar=Math.floor(tick/384);$('time').textContent=String(bar+1).padStart(3,'0')+' : '+String(Math.floor(tick%384/96)+1).padStart(2,'0');
  if(bar<song.bars&&bar!==page){page=bar;drawOverview();drawRoll();$('page').value=page;}
- $('playhead').style.display='block';$('playhead').style.left=(tick%384)/384*100+'%';requestAnimationFrame(animate);
+ $('playhead').style.display='block';$('playhead').style.left=(tick%384)/384*100+'%';if(view==='step')followStep(tick);requestAnimationFrame(animate);
 }
 function download(data,filename){const url=URL.createObjectURL(data),a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-async function exportSong(format){status('出力を作成中…');const response=await api('/api/export',{song,format});const ext={bundle:'.zip',json:'.msx.json',registers:'.registers.json',header:'.h',vgm:'.vgm',wav:'.wav'}[format];download(await response.blob(),(song.title.replace(/[^\p{L}\p{N}_-]/gu,'_')||'song')+ext);status('出力しました · '+format);}
+async function exportSong(format){status('出力を作成中…');const response=await api('/api/export',{song,format});const ext={bundle:'.zip',json:'.msx.json',registers:'.registers.json',header:'.h',vgm:'.vgm',mgs:'.mgs',wav:'.wav'}[format];const base=format==='mgs'?(song.title.replace(/[^A-Za-z0-9_]/g,'').slice(0,8).toUpperCase()||'MUSIC'):(song.title.replace(/[^\p{L}\p{N}_-]/gu,'_')||'song');download(await response.blob(),base+ext);status('出力しました · '+format);}
 async function replaceSong(next){await api('/api/validate',{song:next});edit(()=>{song=next;selected=null;page=0;solo=null;});}
 function drawWave(){const ctx=$('wave-canvas').getContext('2d');ctx.clearRect(0,0,256,100);ctx.strokeStyle='#2d3c45';ctx.beginPath();ctx.moveTo(0,50);ctx.lineTo(256,50);ctx.stroke();ctx.strokeStyle=colors.SCC;ctx.lineWidth=2;ctx.beginPath();track().wave.forEach((v,i)=>{const y=50-v/128*45;if(i===0)ctx.moveTo(0,y);else ctx.lineTo(i*8,y);ctx.lineTo((i+1)*8,y);});ctx.stroke();}
 let waveDrawing=false,waveBefore=null;
@@ -155,6 +197,7 @@ $('undo').onclick=()=>history('undo');$('redo').onclick=()=>history('redo');$('d
 $('rest').onclick=()=>$('step-cursor').value=Math.min(end()-1,+$('step-cursor').value+ +$('length').value);
 $('step-delete').onclick=()=>{const n=track().notes.find(n=>n.start===+$('step-cursor').value);if(n){selected=n.id;deleteSelected();}};
 $('copy-bar').onclick=()=>{if(page+1>=song.bars){status('複製先の小節を先に追加してください。',true);return;}const notes=track().notes.filter(n=>n.start>=page*384&&n.start<(page+1)*384).map(n=>({...n,id:crypto.randomUUID(),start:n.start+384}));if(notes.some(n=>!fits(n))){status('複製先の音と重なります。',true);return;}edit(()=>{track().notes.push(...notes);page++;});};
+$('master-volume').oninput=updateMaster;
 $('play').onclick=safe(play);$('stop').onclick=stop;$('rewind').onclick=()=>{stop();page=0;draw();};
 $('save').onclick=safe(()=>exportSong('json'));
 for(const id of ['import','export','help'])$(id).onclick=()=>$(id+'-dialog').showModal();

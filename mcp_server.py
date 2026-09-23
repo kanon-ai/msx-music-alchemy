@@ -6,6 +6,7 @@ import sys
 from urllib.request import Request,urlopen
 from urllib.error import HTTPError
 import core
+from mgs import export_mgs
 from mml import import_mml
 
 BASE='http://127.0.0.1:7913'
@@ -29,7 +30,7 @@ TOOLS=[
  tool('set_track_notes','Replace one track notes atomically; other tracks are preserved.',{'trackId':{'type':'string'},'notes':{'type':'array','items':{'type':'object'}},'revision':{'type':'integer'}},['trackId','notes','revision']),
  tool('import_mml','Parse MGSC melodic subset into editable JSON. Does not overwrite the editor.',{'text':{'type':'string'}},['text'],True),
  tool('validate_song','Validate a song including frame timing and hardware constraints.',{'song':{'type':'object'}},['song'],True),
- tool('export_song','Export the supplied song to outputs. A new filename is required; never overwrites.',{'song':{'type':'object'},'format':{'type':'string','enum':['json','registers','header','vgm','wav','bundle']},'filename':{'type':'string'}},['song','format','filename'])
+ tool('export_song','Export the supplied song to outputs. MGS supports 60 Hz, 17 channels, up to 16 KiB. A new filename is required; never overwrites.',{'song':{'type':'object'},'format':{'type':'string','enum':['json','registers','header','vgm','mgs','wav','bundle']},'filename':{'type':'string'}},['song','format','filename'])
 ]
 
 def call(name,args):
@@ -51,7 +52,7 @@ def call(name,args):
         p=core.validate(args['song']); fmt=args['format']; name=args['filename']
         import re
         if not isinstance(name,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,70}',name) or name.upper() in {'CON','PRN','AUX','NUL',*[f'COM{i}' for i in range(10)],*[f'LPT{i}' for i in range(10)]}: raise ValueError('Use a plain alphanumeric filename without extension.')
-        exporters={'json':(lambda:json.dumps(p,ensure_ascii=False,indent=2).encode(),'.msx.json'),'registers':(lambda:json.dumps(core.compile_song(p),indent=2).encode(),'.registers.json'),'header':(lambda:core.header(p).encode(),'.h'),'vgm':(lambda:core.vgm(p),'.vgm'),'wav':(lambda:core.render(p),'.wav'),'bundle':(lambda:core.bundle(p),'.zip')}
+        exporters={'json':(lambda:json.dumps(p,ensure_ascii=False,indent=2).encode(),'.msx.json'),'registers':(lambda:json.dumps(core.compile_song(p),indent=2).encode(),'.registers.json'),'header':(lambda:core.header(p).encode(),'.h'),'vgm':(lambda:core.vgm(p),'.vgm'),'mgs':(lambda:export_mgs(p),'.mgs'),'wav':(lambda:core.render(p),'.wav'),'bundle':(lambda:core.bundle(p),'.zip')}
         if fmt not in exporters: raise ValueError('Unknown format')
         fn,ext=exporters[fmt]; data=fn(); OUTPUT.mkdir(parents=True,exist_ok=True); target=OUTPUT/(name+ext)
         with target.open('xb') as f: f.write(data)
@@ -65,7 +66,7 @@ def handle(req):
     result=None
     if method=='initialize':
         version=params.get('protocolVersion'); supported=['2024-11-05','2025-03-26','2025-06-18','2025-11-25']
-        result=dict(protocolVersion=version if version in supported else supported[-1],capabilities=dict(tools=dict(listChanged=False)),serverInfo=dict(name='msx-music-alchemy',version='0.1.0'))
+        result=dict(protocolVersion=version if version in supported else supported[-1],capabilities=dict(tools=dict(listChanged=False)),serverInfo=dict(name='msx-music-alchemy',version='0.2.0'))
     elif method=='ping': result={}
     elif method=='tools/list': result=dict(tools=TOOLS)
     elif method=='tools/call':

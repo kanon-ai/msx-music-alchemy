@@ -47,6 +47,11 @@ class IntegrationTests(unittest.TestCase):
         with self.request('/') as r:self.assertIn(b'roll-view',r.read())
         with self.request('/api/export',dict(song=core.demo_song(),format='bundle')) as r:
             self.assertEqual(r.headers['Content-Type'],'application/zip');self.assertTrue(r.read().startswith(b'PK'))
+        with self.request('/api/export',dict(song=core.demo_song(),format='mgs')) as r:
+            self.assertEqual(r.headers['Content-Type'],'application/octet-stream');self.assertTrue(r.read().startswith(b'MGS303\r\n'))
+        p=core.demo_song();p['hz']=50
+        with self.assertRaises(HTTPError) as caught:self.request('/api/export',dict(song=p,format='mgs'))
+        self.assertEqual(caught.exception.code,400)
     def test_mml_error_keeps_editor_unchanged(self):
         with self.request('/api/state') as r:before=json.load(r)
         with self.assertRaises(HTTPError):self.request('/api/mml',{'text':'1 v12 c4 h1,2,3,4'})
