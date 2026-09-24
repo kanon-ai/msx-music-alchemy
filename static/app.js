@@ -7,6 +7,30 @@ let undo=[],redo=[],saveTimer=null,dirty=false,saving=false,conflict=false,drag=
 let masterGain=null,previewBoost=1;
 let stepRows=[],stepFollowRow=null;
 let audioContext=null,source=null,playing=false,playStart=0,playOffset=0,renderId=0;
+// BEGIN PREVIEW CACHE
+class PreviewCache {
+ constructor(render){this.render=render;this.entry=null;this.tail=Promise.resolve();}
+ get(key){
+  if(this.entry?.key===key)return this.entry.promise;
+  const entry={key,promise:null};this.entry=entry;
+  entry.promise=this.tail.catch(()=>{}).then(()=>{
+   if(this.entry!==entry)throw new Error('Preview superseded');
+   return this.render(key);
+  }).catch(error=>{if(this.entry===entry)this.entry=null;throw error;});
+  this.tail=entry.promise;return entry.promise;
+ }
+}
+// END PREVIEW CACHE
+const previewCache=new PreviewCache(async key=>{
+ const response=await api('/api/render',{song:JSON.parse(key)});
+ return {bytes:await response.arrayBuffer(),buffer:null,gain:null};
+});
+let previewTimer=null;
+function playbackSong(){const p=clone(song);if(solo!==null)p.tracks.forEach((t,i)=>t.mute=i!==solo);return p;}
+function schedulePreview(){
+ clearTimeout(previewTimer);
+ previewTimer=setTimeout(()=>{if(song&&!playing)previewCache.get(JSON.stringify(playbackSong())).catch(()=>{});},800);
+}
 const track=()=>song.tracks[trackIndex], end=()=>song.bars*384;
 const drumKeys={6:[36],7:[38,42],8:[45,49]}, drumNames={36:'バスドラム',38:'スネア',42:'ハイハット',45:'タム',49:'シンバル'};
 const isPsgDrum=()=>track().chip==='PSG'&&track().psgMode==='drums';
@@ -42,7 +66,7 @@ function drawTracks(){
    const no=document.createElement('span');no.className='track-number';no.textContent=String(t.channel+1).padStart(2,'0');
    const name=document.createElement('span');name.className='track-name';name.textContent=t.name;name.title=t.name;
    const mute=document.createElement('button');mute.textContent='M';mute.classList.toggle('on',t.mute);mute.title=t.name+'をミュート';mute.onclick=e=>{e.stopPropagation();edit(()=>t.mute=!t.mute);};
-   const s=document.createElement('button');s.textContent='S';s.classList.toggle('on',solo===i);s.title=t.name+'をソロ試聴';s.onclick=e=>{e.stopPropagation();solo=solo===i?null:i;stop();drawTracks();};
+   const s=document.createElement('button');s.textContent='S';s.classList.toggle('on',solo===i);s.title=t.name+'をソロ試聴';s.onclick=e=>{e.stopPropagation();solo=solo===i?null:i;stop();drawTracks();schedulePreview();};
    row.append(no,name,mute,s);row.onclick=()=>{trackIndex=i;selected=null;if(isDrum()){topPitch=59;$('octave').value=48;}draw();};container.append(row);
   });
  }
@@ -117,6 +141,7 @@ function clearStepPlayback(){
  stepFollowRow=null;$('step-play-position').textContent='停止中';
 }
 function draw(){
+ schedulePreview();
  page=Math.min(page,song.bars-1);refreshInputs();drawTracks();drawOverview();drawRoll();drawInspector();if(view==='step')drawStep();
 }
 function fits(n,ignore=null){return validDrum(n.pitch)&&n.start>=0&&n.duration>=1&&n.start+n.duration<=end()&&n.pitch>=24&&n.pitch<=95&&n.velocity>=1&&n.velocity<=15&&!track().notes.some(x=>x.id!==ignore&&n.start<x.start+x.duration&&n.start+n.duration>x.start);}
@@ -159,9 +184,10 @@ async function play(){
  if(playing){stop();return;}const id=++renderId;
  audioContext??=new AudioContext();await audioContext.resume();$('play').disabled=true;status('音源をレンダリングしています…');
  try{
-  const p=clone(song);if(solo!==null)p.tracks.forEach((t,i)=>t.mute=i!==solo);
-  const response=await api('/api/render',{song:p});const buffer=await audioContext.decodeAudioData(await response.arrayBuffer());if(id!==renderId)return;
-  previewBoost=previewGain(buffer);
+  const p=playbackSong();const prepared=await previewCache.get(JSON.stringify(p));if(id!==renderId)return;
+  if(!prepared.buffer){prepared.buffer=await audioContext.decodeAudioData(prepared.bytes.slice(0));prepared.gain=previewGain(prepared.buffer);}
+  const buffer=prepared.buffer;if(id!==renderId)return;
+  previewBoost=prepared.gain;
   if(!masterGain){masterGain=audioContext.createGain();masterGain.connect(audioContext.destination);}
   masterGain.gain.cancelScheduledValues(audioContext.currentTime);
   masterGain.gain.setValueAtTime(previewBoost*Number($('master-volume').value)/100,audioContext.currentTime);

@@ -1,4 +1,4 @@
-# MSX Music Alchemy v0.5.0
+# MSX Music Alchemy v0.5.1
 
 **Turn ideas into chip music.** A local-first PSG / OPLL / SCC music editor with a piano roll,
 step entry, game-ready data exports, and an MCP server for AI-assisted composition.
@@ -113,3 +113,7 @@ OPLLの再生エンジンをymfmへ変更し、旧エンジンで発音時に聞
 - OPLLの同一フレーム再発音でアタックが弱くなる問題を修正。
 - PSGノイズ／ドラムはWAV・VGM・レジスタ出力対応。MGS出力は未対応です。
 - この版のWindows ZIPはエディタのみ。楽曲サンプルはリポジトリのsamplesを参照してください。
+
+## v0.5.1 再生開始の高速化
+
+読み込み・編集後に試聴音声を事前生成し、同じ楽曲の再生では再利用します。音符・音色・ミュート・ソロの変更は再生成に反映されます。準備前の再生では生成完了まで待機します。曲のタイミングと書き出し音声は変更しません。
