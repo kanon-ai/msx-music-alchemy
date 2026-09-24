@@ -63,6 +63,10 @@ def validate(song):
         if not isinstance(t.get('name'),str) or len(t['name'])>80: raise ValueError('トラック名は80文字以内です。')
         if type(t.get('mute')) is not bool: raise ValueError('mute は真偽値です。')
         integer(t.get('instrument'),0,15,'音色')
+        if t.get('psgMode','tone') not in ('tone','noise','drums'): raise ValueError('PSG mode must be tone/noise/drums')
+        if t.get('psgMode') in ('noise','drums') and chip!='PSG': raise ValueError('Noise mode requires PSG')
+        integer(t.get('noisePeriod',16),1,31,'PSG noise period')
+        integer(t.get('decayMs',0),0,2000,'PSG decay milliseconds')
         if not isinstance(t.get('wave'),list) or len(t['wave'])!=32: raise ValueError('SCC波形は32サンプル必要です。')
         for v in t['wave']: integer(v,-128,127,'SCC波形')
         if not isinstance(t.get('notes'),list): raise ValueError('notes は配列です。')
@@ -73,6 +77,14 @@ def validate(song):
             if not isinstance(n,dict): raise ValueError('ノートはオブジェクトです。')
             integer(n.get('start'),0,end-1,'開始tick'); integer(n.get('duration'),1,end,'音長tick')
             integer(n.get('pitch'),24,95,'MIDI音程'); integer(n.get('velocity'),1,15,'音量')
+            if 'noisePeriod' in n:
+                integer(n['noisePeriod'],1,31,'PSG note noise period')
+                if chip!='PSG' or t.get('psgMode') not in ('noise','drums'): raise ValueError('Noise period requires PSG percussion mode')
+            if 'decayMs' in n:
+                integer(n['decayMs'],0,2000,'PSG note decay milliseconds')
+                if chip!='PSG' or t.get('psgMode') not in ('noise','drums'): raise ValueError('Decay requires PSG percussion mode')
+            if chip=='PSG' and t.get('psgMode')=='drums' and n['pitch'] not in DRUMS:
+                raise ValueError('PSG drums: use MIDI 36/38/42/45/49')
             if p.get('opllRhythm') and chip=='OPLL' and t['channel']>=6:
                 if n['pitch'] not in DRUMS or DRUMS[n['pitch']][0]!=t['channel']:
                     raise ValueError('OPLLリズム: ch7=C2(36)、ch8=D2(38)/F#2(42)、ch9=A2(45)/C#3(49) を使用してください。')
@@ -82,6 +94,8 @@ def validate(song):
             last=n['start']+n['duration']
             if last>end: raise ValueError('ノートが曲の終端を超えています。')
         t['notes'].sort(key=lambda n:n['start'])
+    if sum(t['chip']=='PSG' and t.get('psgMode') in ('noise','drums') and not t['mute'] and bool(t['notes']) for t in p['tracks'])>1:
+        raise ValueError('PSG noise generator is shared; use one noise track')
     scc={t['channel']:t for t in p['tracks'] if t['chip']=='SCC'}
     if scc[3]['wave']!=scc[4]['wave']: raise ValueError('標準SCCの4・5チャンネルは同じ波形を共有します。')
     return p
@@ -137,6 +151,45 @@ def compile_song(song):
     for f,on,t,n in sorted(schedule,key=lambda x:(x[0],x[1])):
         chip=t['chip']; ch=t['channel']; freq=440*2**((n['pitch']-69)/12)
         if chip=='PSG':
+            if t.get('psgMode')=='drums':
+                # One PSG voice, synthesized percussive tone/noise with frame envelope.
+                # (noise period or None, pitch start/end or None, decay milliseconds)
+                presets={36:(None,48,28,100),38:(17,55,50,90),42:(3,None,None,40),45:(None,55,43,140),49:(5,None,None,220)}
+                noise,high,low,ms=presets[n['pitch']]
+                mixer|=(1<<ch)|(1<<(ch+3))
+                if on:
+                    if noise is not None:
+                        write(f,0,6,n.get('noisePeriod',t.get('noisePeriod',noise)));mixer&=~(1<<(ch+3))
+                    if high is not None:mixer&=~(1<<ch)
+                    off=frame(n['start']+n['duration'])
+                    ms=n.get('decayMs',0) or t.get('decayMs',0) or ms
+                    decay=max(1,round(ms*hz/1000));gate=min(off-f,decay)
+                    for df in range(gate):
+                        progress=df/decay
+                        if high is not None:
+                            pitch=high+(low-high)*min(1,progress*2)
+                            period=min(4095,max(1,round(1789773/(16*440*2**((pitch-69)/12)))))
+                            write(f+df,0,ch*2,period&255);write(f+df,0,ch*2+1,period>>8)
+                        write(f+df,0,8+ch,max(0,round(n['velocity']*(1-progress)**2)))
+                    if f+gate<off:write(f+gate,0,8+ch,0)
+                else:write(f,0,8+ch,0)
+                write(f,0,7,mixer)
+                continue
+            if t.get('psgMode')=='noise':
+                mixer|=1<<ch
+                if on:
+                    write(f,0,6,n.get('noisePeriod',t.get('noisePeriod',16)))
+                    write(f,0,8+ch,n['velocity']); mixer&=~(1<<(ch+3))
+                    off=frame(n['start']+n['duration'])
+                    ms=n.get('decayMs',0) or t.get('decayMs',0)
+                    decay=max(1,round(ms*hz/1000)) if ms else off-f
+                    for df in range(1,off-f):
+                        level=max(0 if ms else 1,round(n['velocity']*max(0,1-df/decay)**2))
+                        write(f+df,0,8+ch,level)
+                else:
+                    write(f,0,8+ch,0); mixer|=1<<(ch+3)
+                write(f,0,7,mixer)
+                continue
             if on:
                 period=round(1789773/(16*freq))
                 write(f,0,ch*2,period&255); write(f,0,ch*2+1,period>>8)

@@ -146,7 +146,7 @@ class McpTests(unittest.TestCase):
         proc=subprocess.run([sys.executable,str(core.ROOT/'mcp_server.py')],input='\n'.join(json.dumps(m) for m in messages).encode(),capture_output=True,timeout=10)
         responses=[json.loads(line) for line in proc.stdout.splitlines()]
         self.assertEqual(proc.returncode,0);self.assertEqual(len(responses),3)
-        self.assertEqual(len(responses[1]['result']['tools']),8)
+        self.assertEqual({t['name'] for t in responses[1]['result']['tools']}, {t['name'] for t in mcp_server.TOOLS})
         self.assertEqual(json.loads(responses[2]['result']['content'][0]['text'])['title'],'Test')
     def test_invalid_tool_returns_error(self):
         response=mcp_server.handle(dict(jsonrpc='2.0',id=1,method='tools/call',params=dict(name='validate_song',arguments={'song':{}})))

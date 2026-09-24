@@ -6,7 +6,7 @@ python -m PyInstaller --noconfirm --clean --onedir --name MSXMusicAlchemy --add-
 if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
 Copy-Item -LiteralPath README.md,MCP_SETUP.md,THIRD_PARTY.md,LICENSE,DISCLAIMER.md -Destination dist/MSXMusicAlchemy
 Copy-Item -LiteralPath docs -Destination dist/MSXMusicAlchemy/docs -Recurse -Force
-Copy-Item -LiteralPath samples -Destination dist/MSXMusicAlchemy -Recurse -Force
+# Editor-only release: music samples are available separately in the repository.
 New-Item -ItemType Directory -Path releases -Force | Out-Null
-Compress-Archive -Path dist/MSXMusicAlchemy -DestinationPath releases/MSXMusicAlchemy-v0.4.0-windows-x64.zip -Force
-Get-FileHash releases/MSXMusicAlchemy-v0.4.0-windows-x64.zip -Algorithm SHA256
+Compress-Archive -Path dist/MSXMusicAlchemy -DestinationPath releases/MSXMusicAlchemy-v0.5.0-windows-x64.zip -Force
+Get-FileHash releases/MSXMusicAlchemy-v0.5.0-windows-x64.zip -Algorithm SHA256

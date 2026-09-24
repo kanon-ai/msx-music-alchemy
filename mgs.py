@@ -12,6 +12,8 @@ MAX_DATA = 0x4000
 
 def export_mgs(song):
     p = core.validate(song)
+    if any(t.get('psgMode') in ('noise','drums') and t['notes'] and not t['mute'] for t in p['tracks']):
+        raise ValueError('PSG noise MGS export is unsupported; use WAV, VGM or register JSON')
     if p.get('opllRhythm'):
         raise ValueError('OPLLリズム曲のMGS出力は未対応です。VGM、WAV、レジスタJSONをご利用ください。')
     if p['hz'] != 60:

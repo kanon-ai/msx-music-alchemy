@@ -49,3 +49,12 @@ tuning and hardware mix levels can differ from the editor. See MGSDRV_EXPORT.md.
 ### OPLL rhythm (experimental)
 Optional `opllRhythm: true` reserves OPLL channels 6–8 (zero based) for percussion. MIDI keys: channel 6 = 36 (bass drum), channel 7 = 38 (snare) / 42 (hi-hat), channel 8 = 45 (tom) / 49 (cymbal). Each track remains monophonic. Instrument is ignored on these three channels. Use velocity 1–15 and explicit short note durations; notes must last at least one frame. Omit the field for unchanged nine-channel melodic playback. WAV, VGM, register JSON and game bundles support rhythm; MGS export rejects rhythm songs explicitly. No hardware validation yet.
 Reference: [Yamaha YM2413 application manual](https://www.smspower.org/maxim/Documents/YM2413ApplicationManual).
+
+### Reusable arrangement recipes
+
+Use `get_arrangement_templates` and `preview_arrangement_template` to create quiet echoes on empty OPLL tracks without overwriting source notes. Preview returns a song and report; apply with the current revision through `set_song`. See `CHIPTUNE_TEMPLATES.md` for exact delay/attenuation, rhythm-channel guards and the distinction between existing ROM vibrato and unsupported programmable vibrato.
+
+PSG noise: set track psgMode='noise', noisePeriod=1..31 (default 16). Optional note noisePeriod overrides the track. Volume decays per frame. Only one non-muted populated noise track is supported because AY noise is shared. Other PSG tracks retain tone. WAV/VGM/register exports supported; MGS rejects active noise tracks. Removing noise mode requires removing note noisePeriod fields.
+
+### PSG drum kit and decay
+Use `psgMode: "drums"` for MIDI 36 kick, 38 snare, 42 hat, 45 tom, 49 cymbal. Kick/tom use descending tone pitch; snare combines tone/noise. Only one populated, unmuted noise/drum track is supported. Each track or note may specify `decayMs` (0=automatic/inherit, 1..2000). Notes override tracks; automatic kit lengths are 100/90/40/140/220 ms. Decay ends at the note-off if earlier; timing resolution is the song's 50/60 Hz frame rate. Existing noise tracks without decayMs retain their old envelope. UI has track and selected-note decay controls; step entry supplies named kit keys. MGS export is unsupported for active noise/kit tracks; WAV/VGM/register streams preserve the sound.

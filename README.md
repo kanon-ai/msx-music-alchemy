@@ -1,4 +1,4 @@
-# MSX Music Alchemy v0.4.0
+# MSX Music Alchemy v0.5.0
 
 **Turn ideas into chip music.** A local-first PSG / OPLL / SCC music editor with a piano roll,
 step entry, game-ready data exports, and an MCP server for AI-assisted composition.
@@ -62,7 +62,7 @@ UTF-8 / Shift-JISの.mus / .mml入力、貼り付けに対応。未対応構文�
 
 ## 現時点の範囲
 
-PSGは矩形波トーン。ノイズ／ハード・ソフトエンベロープは未対応。
+PSGは矩形波、ノイズ減衰、ドラムキットに対応。トラック／音符ごとの減衰時間を指定できます。ハードウェアエンベロープは未対応です。
 OPLLは9音メロディ、または6音メロディ＋リズム（実験対応）。リズム時はOPLL 7〜9をドラムに使用します。リズム曲のMGS出力は未対応です。音色はトラック内で固定。
 SCCは標準SCC（4/5ch波形共有）。SCC+専用モードは未対応。
 テンポ・拍子は曲内固定。MMLの高度なマクロ、LFOなどは未対応。
@@ -105,3 +105,11 @@ hardware has not been tested. Read [the disclaimer](DISCLAIMER.md) before integr
 
 OPLLの再生エンジンをymfmへ変更し、旧エンジンで発音時に聞こえたクリックを改善しました。ツール再生・WAV・MP4に適用されます。実機の音を保証するものではありません。
 配布MP4は従来の画面収録に新版の音声を同期して差し替えています。画面内のバージョン・音量表示は旧版です。
+
+## v0.5.0 エディタ更新
+
+- PSGドラムキット（キック・スネア・ハイハット・タム・シンバル）と減衰時間編集。
+- MCPで安全に試作できるOPLLエコーテンプレート。
+- OPLLの同一フレーム再発音でアタックが弱くなる問題を修正。
+- PSGノイズ／ドラムはWAV・VGM・レジスタ出力対応。MGS出力は未対応です。
+- この版のWindows ZIPはエディタのみ。楽曲サンプルはリポジトリのsamplesを参照してください。

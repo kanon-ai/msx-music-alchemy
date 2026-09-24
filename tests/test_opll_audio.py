@@ -14,6 +14,22 @@ import core
 
 
 class OpllAttackTests(unittest.TestCase):
+    def test_touching_guitar_notes_retrigger_without_frame_gap(self):
+        song = core.new_song()
+        song.update(bpm=120, bars=2, loop=False)
+        song['tracks'][3]['instrument'] = 2
+        song['tracks'][3]['notes'] = [dict(id=str(i), pitch=72, start=i*48,
+                                         duration=48, velocity=12) for i in range(12)]
+        with wave.open(io.BytesIO(core.render(song))) as wav:
+            pcm = array.array('h', wav.readframes(wav.getnframes()))
+            if sys.byteorder != 'little':
+                pcm.byteswap()
+        rms = [math.sqrt(sum(x*x for x in pcm[i*11025:i*11025+2205])/2205)
+               for i in range(12)]
+        self.assertGreater(rms[0], 100)
+        self.assertGreater(min(rms[1:]), rms[0]*0.7)
+        self.assertLess(max(rms[1:]), rms[0]*1.3)
+
     def test_bass_and_piano_do_not_have_abrupt_attack_spikes(self):
         source = json.loads((core.ROOT / 'samples/sicilienne-cantabile/song.msx.json').read_text())
         for channels in ([4], list(range(5, 11))):

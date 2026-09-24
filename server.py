@@ -45,7 +45,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed(): return self.reply(dict(error='Local access only'),403)
         route=urlparse(self.path).path
         if route=='/api/state': return self.reply(self.server.store.get())
-        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.4.0',token=self.server.token,patches=core.PATCH_NAMES))
+        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.5.0',token=self.server.token,patches=core.PATCH_NAMES))
         if route=='/api/new': return self.reply(core.new_song())
         if route=='/api/demo': return self.reply(core.demo_song())
         allowed={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}

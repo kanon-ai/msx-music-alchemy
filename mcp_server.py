@@ -8,6 +8,7 @@ from urllib.error import HTTPError
 import core
 from mgs import export_mgs
 from mml import import_mml
+from arrangement_templates import PRESETS, apply_template
 
 BASE='http://127.0.0.1:7913'
 OUTPUT=(Path(sys.executable).resolve().parent if getattr(sys,'frozen',False) else Path(__file__).resolve().parent)/'outputs'
@@ -23,6 +24,8 @@ def http(path,body=None):
 def tool(name,description,props=None,required=None,read=False):
     return dict(name=name,description=description,inputSchema=dict(type='object',properties=props or {},required=required or [],additionalProperties=False),annotations=dict(readOnlyHint=read,destructiveHint=False,openWorldHint=False))
 TOOLS=[
+ tool('get_arrangement_templates','List reusable OPLL echo recipes. Vibrato depth/rate automation is not implemented.',read=True),
+ tool('preview_arrangement_template','Return a copied song with an echo on an empty OPLL track. Does not update the editor; inspect report then use set_song.',{'song':{'type':'object'},'preset':{'type':'string','enum':list(PRESETS)},'sourceId':{'type':'string'},'targetId':{'type':'string'}},['song','preset','sourceId','targetId'],True),
  tool('get_song','Get the editor song and revision before changing it. Server must be running.',read=True),
  tool('get_composition_guide','Read schema, timing, channel restrictions, and AI composition workflow.',read=True),
  tool('new_song','Return a blank 17-channel song; does not overwrite the editor.',{'title':{'type':'string'}},read=True),
@@ -34,6 +37,8 @@ TOOLS=[
 ]
 
 def call(name,args):
+    if name=='get_arrangement_templates': return dict(presets=PRESETS,notes='Attenuation is OPLL volume steps, not linear percent. ROM flute already has carrier hardware vibrato. Echo needs an empty OPLL voice.')
+    if name=='preview_arrangement_template': return apply_template(args['song'],args['preset'],args['sourceId'],args['targetId'])
     if name=='get_song': return http('/api/state')
     if name=='get_composition_guide':
         return dict(guide=(core.ROOT/'docs/AI_COMPOSITION.md').read_text(encoding='utf-8'),schema=json.loads((core.ROOT/'docs/song.schema.json').read_text()))

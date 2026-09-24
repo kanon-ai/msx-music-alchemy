@@ -151,9 +151,37 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 15
+                },
+                "noisePeriod": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 31
+                },
+                "decayMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2000
                 }
               }
             }
+          },
+          "psgMode": {
+            "type": "string",
+            "enum": [
+              "tone",
+              "noise",
+              "drums"
+            ]
+          },
+          "noisePeriod": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31
+          },
+          "decayMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2000
           }
         }
       }

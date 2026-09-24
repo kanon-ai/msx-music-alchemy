@@ -9,8 +9,10 @@ let stepRows=[],stepFollowRow=null;
 let audioContext=null,source=null,playing=false,playStart=0,playOffset=0,renderId=0;
 const track=()=>song.tracks[trackIndex], end=()=>song.bars*384;
 const drumKeys={6:[36],7:[38,42],8:[45,49]}, drumNames={36:'バスドラム',38:'スネア',42:'ハイハット',45:'タム',49:'シンバル'};
-const isDrum=()=>!!song.opllRhythm&&track().chip==='OPLL'&&track().channel>=6;
-const validDrum=p=>!isDrum()||drumKeys[track().channel].includes(p);
+const isPsgDrum=()=>track().chip==='PSG'&&track().psgMode==='drums';
+const isDrum=()=>isPsgDrum()||(!!song.opllRhythm&&track().chip==='OPLL'&&track().channel>=6);
+const currentDrumKeys=()=>isPsgDrum()?[36,38,42,45,49]:drumKeys[track().channel];
+const validDrum=p=>!isDrum()||currentDrumKeys().includes(p);
 const status=(message,error=false)=>{ $('status').textContent=message; $('status').classList.toggle('error',error); };
 function safe(fn){return (...args)=>Promise.resolve().then(()=>fn(...args)).catch(e=>status(e.message,true));}
 async function api(path,data){
@@ -79,12 +81,13 @@ function drawInspector(){
  for(const chip of ['psg','opll','scc'])$(chip+'-controls').hidden=t.chip.toLowerCase()!==chip;
  $('opll-rhythm').checked=!!song.opllRhythm;$('rhythm-help').hidden=!song.opllRhythm;$('instrument').disabled=isDrum();
  $('instrument').value=t.instrument;$('patch').value=song.opllPatch.map(v=>v.toString(16).padStart(2,'0')).join(' ');drawWave();
- const n=t.notes.find(n=>n.id===selected);$('note-controls').hidden=!n;$('note-empty').hidden=!!n;
+ $('psg-mode').value=t.psgMode||'tone';$('noise-period').value=t.noisePeriod||16;$('noise-period').disabled=t.psgMode!=='noise';$('psg-decay').value=t.decayMs||0;$('psg-decay').disabled=!['noise','drums'].includes(t.psgMode);
+ const n=t.notes.find(n=>n.id===selected);$('note-decay-label').hidden=!n||t.chip!=='PSG'||!['noise','drums'].includes(t.psgMode);$('note-decay').value=n?.decayMs||0;$('note-controls').hidden=!n;$('note-empty').hidden=!!n;
  if(n)for(const field of ['pitch','start','duration','velocity'])$('note-'+field).value=n[field];
  $('note-count').textContent=t.notes.length+' NOTES';$('undo').disabled=!undo.length;$('redo').disabled=!redo.length;
 }
 function drawStep(){
- $('step-keys').replaceChildren();for(const p of (isDrum()?drumKeys[track().channel]:Array.from({length:13},(_,i)=>topPitch-23+i))){
+ $('step-keys').replaceChildren();for(const p of (isDrum()?currentDrumKeys():Array.from({length:13},(_,i)=>topPitch-23+i))){
   const b=document.createElement('button');b.textContent=isDrum()?drumNames[p]:noteName(p);if([1,3,6,8,10].includes(p%12))b.className='black';b.onclick=()=>stepNote(p);$('step-keys').append(b);
  }
  stepRows=[];stepFollowRow=null;
@@ -193,6 +196,10 @@ $('loop').onchange=e=>edit(()=>song.loop=e.target.checked);
 $('loopStart').onchange=e=>{const v=(+e.target.value-1)*384;if(!Number.isInteger(v)||v<0||v>=end()){draw();return;}edit(()=>song.loopStart=v);};
 $('track-name').onchange=e=>edit(()=>track().name=e.target.value);
 $('opll-rhythm').onchange=e=>{const enabled=e.target.checked;if(song.tracks.some(t=>t.chip==='OPLL'&&t.channel>=6&&t.notes.length)){status('モード切替前にOPLL 7〜9のノートを退避して空にしてください。',true);drawInspector();return;}edit(()=>song.opllRhythm=enabled);};
+$('psg-mode').onchange=e=>{const mode=e.target.value;if(mode==='drums'&&track().notes.some(n=>![36,38,42,45,49].includes(n.pitch))){status('ドラムキットはMIDI 36/38/42/45/49のノートで使用してください。',true);drawInspector();return;}edit(()=>{track().psgMode=mode;if(mode==='tone')track().notes.forEach(n=>{delete n.noisePeriod;delete n.decayMs;});});};
+$('psg-decay').onchange=e=>edit(()=>track().decayMs=+e.target.value);
+$('note-decay').onchange=e=>edit(()=>{const n=track().notes.find(n=>n.id===selected);if(n)n.decayMs=+e.target.value;});
+$('noise-period').onchange=e=>edit(()=>track().noisePeriod=+e.target.value);
 $('instrument').onchange=e=>edit(()=>track().instrument=+e.target.value);
 $('patch').onchange=e=>{const values=e.target.value.trim().split(/\s+/);if(values.length!==8||values.some(v=>!/^[0-9a-f]{2}$/i.test(v))){status('OPLL音色は2桁の16進数を8個、空白で区切ってください。',true);drawInspector();return;}edit(()=>song.opllPatch=values.map(v=>parseInt(v,16)));};
 for(const field of ['pitch','start','duration','velocity'])$('note-'+field).onchange=e=>{const n=track().notes.find(n=>n.id===selected),v=+e.target.value;if(!n)return;const candidate={...n,[field]:v};if(!Number.isInteger(v)||!fits(candidate,n.id)){status('値が範囲外か、他の音と重なります。',true);drawInspector();return;}edit(()=>Object.assign(n,candidate));};
