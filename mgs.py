@@ -12,6 +12,8 @@ MAX_DATA = 0x4000
 
 def export_mgs(song):
     p = core.validate(song)
+    if p.get('opllRhythm'):
+        raise ValueError('OPLLリズム曲のMGS出力は未対応です。VGM、WAV、レジスタJSONをご利用ください。')
     if p['hz'] != 60:
         raise ValueError('MGSDRV出力は60 Hz専用です。更新周波数を60 Hzにして出力してください。')
     # Reuse the native compiler's frame-boundary validation, including short notes.

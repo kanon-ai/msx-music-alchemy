@@ -157,6 +157,11 @@
           }
         }
       }
+    },
+    "opllRhythm": {
+      "type": "boolean",
+      "default": false,
+      "description": "Optional. Six melodic OPLL channels plus rhythm on channels 6..8 (zero-based); see AI_COMPOSITION.md."
     }
   }
 }

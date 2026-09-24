@@ -42,3 +42,8 @@ HTTP/MCP出力、入力データの不変性も確認しています。物理MSX
 
 フォーマット参考: [MGSDRV v3 data format](https://github.com/digital-sound-antiques/mgsc/blob/master/mgs-format.md)。
 出力処理は独自実装で、他プロジェクトのコンパイラやドライバのバイナリは含みません。
+
+
+### OPLL rhythm (experimental)
+Optional `opllRhythm: true` reserves OPLL channels 6–8 (zero based) for percussion. MIDI keys: channel 6 = 36 (bass drum), channel 7 = 38 (snare) / 42 (hi-hat), channel 8 = 45 (tom) / 49 (cymbal). Each track remains monophonic. Instrument is ignored on these three channels. Use velocity 1–15 and explicit short note durations; notes must last at least one frame. Omit the field for unchanged nine-channel melodic playback. WAV, VGM, register JSON and game bundles support rhythm; MGS export rejects rhythm songs explicitly. No hardware validation yet.
+Reference: [Yamaha YM2413 application manual](https://www.smspower.org/maxim/Documents/YM2413ApplicationManual).

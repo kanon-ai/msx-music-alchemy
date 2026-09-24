@@ -44,3 +44,8 @@ patch, SCC waves, mute and nonzero loop starts. Requires 60 Hz and at most 16 Ki
 of binary data; unsupported/oversize songs fail explicitly without truncation.
 MSX playback needs MGSDRV and a compatible player, supplied separately. Driver
 tuning and hardware mix levels can differ from the editor. See MGSDRV_EXPORT.md.
+
+
+### OPLL rhythm (experimental)
+Optional `opllRhythm: true` reserves OPLL channels 6–8 (zero based) for percussion. MIDI keys: channel 6 = 36 (bass drum), channel 7 = 38 (snare) / 42 (hi-hat), channel 8 = 45 (tom) / 49 (cymbal). Each track remains monophonic. Instrument is ignored on these three channels. Use velocity 1–15 and explicit short note durations; notes must last at least one frame. Omit the field for unchanged nine-channel melodic playback. WAV, VGM, register JSON and game bundles support rhythm; MGS export rejects rhythm songs explicitly. No hardware validation yet.
+Reference: [Yamaha YM2413 application manual](https://www.smspower.org/maxim/Documents/YM2413ApplicationManual).

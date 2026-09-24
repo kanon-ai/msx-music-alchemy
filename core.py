@@ -15,6 +15,8 @@ PPQ = 96
 CHIPS = {'PSG': 3, 'OPLL': 9, 'SCC': 5}
 PATCH_NAMES = ['Custom', 'Violin', 'Guitar', 'Piano', 'Flute', 'Clarinet', 'Oboe', 'Trumpet', 'Organ', 'Horn', 'Synthesizer', 'Harpsichord', 'Vibraphone', 'Synth bass', 'Acoustic bass', 'Electric guitar']
 DEFAULT_PATCH = [0x21, 0x21, 0x1a, 0x06, 0xf0, 0xf0, 0x0f, 0x0f]
+# MIDI drum key -> (OPLL channel, rhythm bit, level register, nibble shift).
+DRUMS = {36:(6,16,0x36,0),38:(7,8,0x37,0),42:(7,1,0x37,4),45:(8,4,0x38,4),49:(8,2,0x38,0)}
 
 def wavetable(kind='triangle'):
     if kind == 'square': return [100 if i < 16 else -100 for i in range(32)]
@@ -43,6 +45,7 @@ def validate(song):
     integer(p.get('bpm'),40,300,'BPM'); integer(p.get('bars'),1,64,'小節数')
     if p.get('ppq')!=PPQ or p.get('hz') not in (50,60): raise ValueError('PPQ=96、更新周波数=50/60Hz に対応しています。')
     if type(p.get('loop')) is not bool: raise ValueError('loop は真偽値です。')
+    if type(p.get('opllRhythm',False)) is not bool: raise ValueError('opllRhythm は真偽値です。')
     end=p['bars']*384
     integer(p.get('loopStart'),0,end-1,'ループ開始位置')
     if end/PPQ*60/p['bpm']>300: raise ValueError('曲の長さは5分以内にしてください。')
@@ -70,6 +73,9 @@ def validate(song):
             if not isinstance(n,dict): raise ValueError('ノートはオブジェクトです。')
             integer(n.get('start'),0,end-1,'開始tick'); integer(n.get('duration'),1,end,'音長tick')
             integer(n.get('pitch'),24,95,'MIDI音程'); integer(n.get('velocity'),1,15,'音量')
+            if p.get('opllRhythm') and chip=='OPLL' and t['channel']>=6:
+                if n['pitch'] not in DRUMS or DRUMS[n['pitch']][0]!=t['channel']:
+                    raise ValueError('OPLLリズム: ch7=C2(36)、ch8=D2(38)/F#2(42)、ch9=A2(45)/C#3(49) を使用してください。')
             if not isinstance(n.get('id'),str) or n['id'] in noteids: raise ValueError('ノートIDが重複しています。')
             noteids.add(n['id'])
             if n['start']<last: raise ValueError(f'{t["name"]}: 同一チャンネルで音が重なっています。')
@@ -111,6 +117,11 @@ def compile_song(song):
     write(0,1,0x0e,0)
     for reg,val in enumerate(p['opllPatch']): write(0,1,reg,val)
     for ch in range(9): write(0,1,0x20+ch,0)
+    rhythm=bool(p.get('opllRhythm')); rhythm_bits=0x20; drum_levels={0x36:15,0x37:255,0x38:255}
+    if rhythm:
+        # Yamaha application manual, rhythm tuning; melodic key bits stay off.
+        for reg,val in [(0x16,0x20),(0x17,0x50),(0x18,0xc0),(0x26,5),(0x27,5),(0x28,1),*drum_levels.items(),(0x0e,0x20)]:
+            write(0,1,reg,val)
     write(0,2,0x8f,0)
     scc={t['channel']:t for t in p['tracks'] if t['chip']=='SCC'}
     for ch in range(4):
@@ -133,6 +144,14 @@ def compile_song(song):
             else: write(f,0,8+ch,0); mixer|=1<<ch
             write(f,0,7,mixer)
         elif chip=='OPLL':
+            if rhythm and ch>=6:
+                _,bit,reg,shift=DRUMS[n['pitch']]
+                if on:
+                    drum_levels[reg]=(drum_levels[reg]&~(15<<shift))|((15-n['velocity'])<<shift)
+                    write(f,1,reg,drum_levels[reg]); rhythm_bits|=bit
+                else: rhythm_bits&=~bit
+                write(f,1,0x0e,rhythm_bits)
+                continue
             block=0; fnum=round(freq*72*2**19/3579545)
             while fnum>511 and block<7:
                 block+=1; fnum=round(freq*72*2**(19-block)/3579545)
@@ -151,6 +170,7 @@ def compile_song(song):
     # Silence every chip at the exact song end. OPLL release is retained for WAV only.
     for ch in range(3): write(frames,0,8+ch,0)
     for ch in range(9): write(frames,1,0x20+ch,0)
+    if rhythm: write(frames,1,0x0e,0x20)
     write(frames,2,0x8f,0)
     if p['loop'] and p['loopStart']:
         # Re-establish register state at a nonzero loop boundary, including notes
@@ -159,9 +179,10 @@ def compile_song(song):
         for writes in events[:lf]:
             for chip,reg,value in writes: state[chip,reg]=value
         restore=[[0,7,0xbf],[2,0x8f,0]]+[[1,0x20+c,0] for c in range(9)]
+        if rhythm: restore.append([1,0x0e,0x20])
         gates=[]
         for (chip,reg),value in sorted(state.items()):
-            target=gates if (chip==0 and reg==7 or chip==1 and 0x20<=reg<=0x28 or chip==2 and reg==0x8f) else restore
+            target=gates if (chip==0 and reg==7 or chip==1 and (0x20<=reg<=0x28 or rhythm and reg==0x0e) or chip==2 and reg==0x8f) else restore
             target.append([chip,reg,value])
         events[lf]=restore+gates+events[lf]
     return dict(format='msx-register-stream',version=1,hz=hz,frames=frames,loop=p['loop'],loopFrame=frame(p['loopStart']),

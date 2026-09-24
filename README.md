@@ -1,4 +1,4 @@
-# MSX Music Alchemy v0.2.0
+# MSX Music Alchemy v0.3.0
 
 **Turn ideas into chip music.** A local-first PSG / OPLL / SCC music editor with a piano roll,
 step entry, game-ready data exports, and an MCP server for AI-assisted composition.
@@ -42,6 +42,12 @@ VGM、C89スケジューラー、AI向け説明、組み込みガイド。WAVも
 muteは出力に反映します。soloは試聴だけに適用し、出力には反映しません。
 MCPは [MCP_SETUP.md](MCP_SETUP.md)、ゲームへの導入は [GAME_INTEGRATION.md](docs/GAME_INTEGRATION.md)。
 
+## MCP作曲サンプル
+
+[ジムノペディ第1番・Jazz arrangement](samples/gymnopedie-jazz/README.md) を同梱。
+原調・全78小節、ビブラフォン＋16分エコー、アコースティックベース、OPLLリズム、PSGコーラス。
+公開原譜の出典、ライセンス、MCPでの読み込み・検証・出力例を付属しています。
+
 ## MML
 
 MGSDRV/MGSC 1.11のメロディ用基本構文をインポートします。
@@ -53,7 +59,7 @@ UTF-8 / Shift-JISの.mus / .mml入力、貼り付けに対応。未対応構文�
 ## 現時点の範囲
 
 PSGは矩形波トーン。ノイズ／ハード・ソフトエンベロープは未対応。
-OPLLは9音メロディ。リズムモードは未対応。音色はトラック内で固定。
+OPLLは9音メロディ、または6音メロディ＋リズム（実験対応）。リズム時はOPLL 7〜9をドラムに使用します。リズム曲のMGS出力は未対応です。音色はトラック内で固定。
 SCCは標準SCC（4/5ch波形共有）。SCC+専用モードは未対応。
 テンポ・拍子は曲内固定。MMLの高度なマクロ、LFOなどは未対応。
 汎用MMLからのMGSコンパイル、MIDI機器入力、実チップ出力、ROM自動生成は含みません。

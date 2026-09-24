@@ -35,7 +35,7 @@ No register 14/15 writes are generated. SFX sharing requires channel arbitration
 
 `chip=1`: YM2413 OPLL, clock 3,579,545 Hz, select port 7Ch, data port 7Dh.
 The callback must respect address/data write delays for the actual CPU (Z80/R800/etc.).
-Nine melodic channels, rhythm disabled. Instrument 0 is one globally shared eight-byte patch.
+Nine melodic channels by default. With optional `opllRhythm: true`, channels 6–8 (zero-based) become hardware percussion, leaving six melodic channels. See AI_COMPOSITION.md for the drum keys. Register streams and VGM retain rhythm writes. Instrument 0 is one globally shared eight-byte patch.
 
 `chip=2`: standard SCC (K051649), clock 3,579,545 Hz. Register is an offset from 9800h:
 00–7F wave RAM, 80–89 periods, 8A–8E volumes, 8F channel mask.

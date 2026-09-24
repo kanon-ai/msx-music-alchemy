@@ -66,7 +66,7 @@ def handle(req):
     result=None
     if method=='initialize':
         version=params.get('protocolVersion'); supported=['2024-11-05','2025-03-26','2025-06-18','2025-11-25']
-        result=dict(protocolVersion=version if version in supported else supported[-1],capabilities=dict(tools=dict(listChanged=False)),serverInfo=dict(name='msx-music-alchemy',version='0.2.0'))
+        result=dict(protocolVersion=version if version in supported else supported[-1],capabilities=dict(tools=dict(listChanged=False)),serverInfo=dict(name='msx-music-alchemy',version='0.3.0'))
     elif method=='ping': result={}
     elif method=='tools/list': result=dict(tools=TOOLS)
     elif method=='tools/call':
