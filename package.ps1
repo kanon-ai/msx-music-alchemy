@@ -8,5 +8,5 @@ Copy-Item -LiteralPath README.md,MCP_SETUP.md,THIRD_PARTY.md,LICENSE,DISCLAIMER.
 Copy-Item -LiteralPath docs -Destination dist/MSXMusicAlchemy/docs -Recurse -Force
 Copy-Item -LiteralPath samples -Destination dist/MSXMusicAlchemy -Recurse -Force
 New-Item -ItemType Directory -Path releases -Force | Out-Null
-Compress-Archive -Path dist/MSXMusicAlchemy -DestinationPath releases/MSXMusicAlchemy-v0.3.1-windows-x64.zip -Force
-Get-FileHash releases/MSXMusicAlchemy-v0.3.1-windows-x64.zip -Algorithm SHA256
+Compress-Archive -Path dist/MSXMusicAlchemy -DestinationPath releases/MSXMusicAlchemy-v0.3.2-windows-x64.zip -Force
+Get-FileHash releases/MSXMusicAlchemy-v0.3.2-windows-x64.zip -Algorithm SHA256

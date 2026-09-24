@@ -14,8 +14,8 @@ def build():
     events = json.loads((HERE / 'source-events.json').read_text())
     song = core.new_song('Faure - Sicilienne | Cantabile - public score edition')
     song.update(bpm=50, bars=45, hz=60, loop=False, loopStart=0)
-    # Faster carrier attack makes the written short notes speak clearly.
-    song['opllPatch'] = [0x11, 0x61, 0x10, 0x07, 0x8d, 0xa4, 0x70, 0x27]
+    # Keep carrier attack slower than the modulator to avoid sharp attack transients.
+    song['opllPatch'] = [0x11, 0x61, 0x10, 0x07, 0x8d, 0x74, 0x70, 0x27]
     names = ['PSG soft inner voice I', 'PSG soft inner voice II', 'PSG soft inner voice III',
              'FM cantabile flute', 'FM acoustic bass', 'FM soft vibraphone',
              'FM piano I', 'FM piano II', 'FM piano III', 'FM piano IV',

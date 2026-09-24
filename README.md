@@ -1,4 +1,4 @@
-# MSX Music Alchemy v0.3.1
+# MSX Music Alchemy v0.3.2
 
 **Turn ideas into chip music.** A local-first PSG / OPLL / SCC music editor with a piano roll,
 step entry, game-ready data exports, and an MCP server for AI-assisted composition.
