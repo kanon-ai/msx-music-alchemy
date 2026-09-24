@@ -38,6 +38,8 @@ MCPはローカルエディタを操作するので、リモートのクラウ�
 
 AIへの指示例:
 
+実際の試聴・修正・保存の流れは [シシリエンヌ制作例](docs/MCP_WALKTHROUGH.md) にまとめています。
+
 > get_composition_guideとget_songを読んでください。現在のPSGメロディは変更せず、
 > SCCに8小節のアルペジオを作曲してください。OPLLには控えめなベースを追加し、
 > validate_songで検証してから更新番号を指定してset_songで反映してください。

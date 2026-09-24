@@ -1,0 +1,50 @@
+# Fauré — Sicilienne, Op.78 / Cantabile
+
+MSX Music AlchemyのMCP編曲サンプル。Gabriel Fauréのシシリエンヌを、
+FM主旋律・FM伴奏・控えめなPSG・薄いSCC補助で演奏します。
+ASTRAによる編曲で、以前の試聴で得た音色・バランスのフィードバックを反映しています。
+
+## 使い方
+
+現在の曲をJSON保存してから、「読み込む」で `song.msx.json` を開き、先頭から再生してください。
+OPLLリズムは使いません。ツールの既存機能だけで再生できます。
+
+- 原譜全86小節。原譜の旋律300音・ピアノ1070音をすべて配分。
+- 主旋律は同じカスタムFMフルートで通し、短音が立ち上がるようアタックを調整。
+- 主旋律を1段階下げ、別FMパートに24tick（表示上の16分音符、300ms）遅れ・約50%振幅のエコーを追加。
+- FMアコースティックベース、ピアノ5声、控えめなビブラフォン。
+- FMに入りきらない和音は弱いPSGへ。中音域に柔らかいPSGコーラスを追加。
+- SCCは長い旋律音への微かな補助のみ。他のSCC4トラックは空です。
+- フレーズ終端の呼吸、穏やかな強弱、終盤の減速。約3分36秒。
+- 原譜は6/8。付点4分音符を96tickとして表現し、フレーズの時間変化を絶対tickへ変換しています。
+  エディタは4/4表示45小節なので、原譜の小節番号とは一致しません。
+
+これは独自のチップ音源編曲です。原曲のオーケストレーションをそのまま再現したものではありません。
+試聴はエミュレーションで、実機検証はしていません。
+
+## MCPと再現
+
+ソース版ルートで `python samples/sicilienne-cantabile/arrange.py` を実行すると、
+同梱CC0音符イベントから `song.msx.json` を再生成します。エディタの曲は変更しません。
+
+`python samples/sicilienne-cantabile/mcp_example.py --load --wav` は実際のMCP stdioを使って、
+検証→現在曲のJSON退避→revision付き読み込み→JSON/VGM/WAV出力を実行します。
+先にエディタを起動してください。`--load` を省けば現在曲は変更されません。
+配布EXEを使う場合は `--exe "C:\path\MSXMusicAlchemy.exe"` を追加します。
+クライアントの実行にはPythonが必要です。
+
+## 出典・ライセンス
+
+- 原曲: Gabriel Fauré (1845–1924), Sicilienne Op.78。1898年出版、パブリックドメイン。
+- 入力資料: Meg Noah, flute and piano arrangement (2024), IMSLP **#906990**,
+  Noteflight / MusicXML。対応PDFは **#906989**。両方とも **CC0 1.0**。
+- [IMSLPの作品・出典・利用条件](https://imslp.org/wiki/Sicilienne,_Op.78_(Faur%C3%A9,_Gabriel))
+- [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+
+`source-events.json` はこのCC0 MusicXMLのタイを統合した音符イベントです。
+各イベントの音高・開始・長さ・記譜強弱・パート・譜表・小節を保持しています。
+そのCC0の地位は変更しません。参照した原ファイルのSHA-256は `source-hashes.json`。
+今回追加した編曲データ・コード・説明および同じデータから生成した演奏動画は、
+権利が成立する範囲で同梱のMIT Licenseにより提供します。
+原曲名・作曲者・Meg Noah版を出典として表示してください。
+商用録音、市販の練習用楽譜、個人の編集履歴は含めていません。

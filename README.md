@@ -1,4 +1,4 @@
-# MSX Music Alchemy v0.3.0
+# MSX Music Alchemy v0.3.1
 
 **Turn ideas into chip music.** A local-first PSG / OPLL / SCC music editor with a piano roll,
 step entry, game-ready data exports, and an MCP server for AI-assisted composition.
@@ -47,6 +47,10 @@ MCPは [MCP_SETUP.md](MCP_SETUP.md)、ゲームへの導入は [GAME_INTEGRATION
 [ジムノペディ第1番・Jazz arrangement](samples/gymnopedie-jazz/README.md) を同梱。
 原調・全78小節、ビブラフォン＋16分エコー、アコースティックベース、OPLLリズム、PSGコーラス。
 公開原譜の出典、ライセンス、MCPでの読み込み・検証・出力例を付属しています。
+
+[シシリエンヌ・Cantabile](samples/sicilienne-cantabile/README.md) も公開しています。
+CC0譜面の全86小節をFM中心に再配分し、PSGコーラスと薄いSCC補助を加えた例です。
+再生成スクリプトとMCPクライアントを付属しています。
 
 ## MML
 
