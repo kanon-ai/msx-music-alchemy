@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
-project(msx_music_render C)
-add_executable(msx_render native/render.c vendor/emu2149/emu2149.c vendor/emu2413/emu2413.c vendor/emu2212/emu2212.c)
-target_include_directories(msx_render PRIVATE vendor/emu2149 vendor/emu2413 vendor/emu2212)
+project(msx_music_render C CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_executable(msx_render native/render.c native/opll.cpp vendor/emu2149/emu2149.c vendor/emu2212/emu2212.c
+  vendor/ymfm/src/ymfm_opl.cpp vendor/ymfm/src/ymfm_adpcm.cpp vendor/ymfm/src/ymfm_pcm.cpp)
+target_include_directories(msx_render PRIVATE vendor/emu2149 vendor/emu2212 vendor/ymfm/src)
 if(MSVC)
   set_property(TARGET msx_render PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()

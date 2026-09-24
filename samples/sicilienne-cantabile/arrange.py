@@ -87,7 +87,7 @@ def build():
         i = available[0]
         v = (9 if i == 4 else 7 if i == 5 else 8) + strength(e)
         if i < 3:
-            v = 2 if e['pitch'] >= 76 else 3
+            v = 1 if e['pitch'] >= 76 else 2
         elif e['pitch'] >= 76:
             v -= 1
         put(i, e['pitch'], start, duration, v)
@@ -104,7 +104,7 @@ def build():
         duration = tm(e['start'] + e['duration']) - start - 7
         for i in [0, 1, 2]:
             if free(i, start, duration):
-                put(i, pitch, start, duration, 2)
+                put(i, pitch, start, duration, 1)
                 coverage['chorus'] += 1
                 break
     for t in song['tracks']:

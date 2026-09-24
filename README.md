@@ -1,4 +1,4 @@
-# MSX Music Alchemy v0.3.2
+# MSX Music Alchemy v0.4.0
 
 **Turn ideas into chip music.** A local-first PSG / OPLL / SCC music editor with a piano roll,
 step entry, game-ready data exports, and an MCP server for AI-assisted composition.
@@ -100,3 +100,8 @@ This software is provided **AS IS**, without warranty. It is not an official or 
 MSX product. The MCP server exposes composition/editing tools but includes no AI model.
 The MML importer supports a documented MGSC subset, not full compatibility. Physical MSX
 hardware has not been tested. Read [the disclaimer](DISCLAIMER.md) before integration.
+
+## v0.4.0 音源更新
+
+OPLLの再生エンジンをymfmへ変更し、旧エンジンで発音時に聞こえたクリックを改善しました。ツール再生・WAV・MP4に適用されます。実機の音を保証するものではありません。
+配布MP4は従来の画面収録に新版の音声を同期して差し替えています。画面内のバージョン・音量表示は旧版です。

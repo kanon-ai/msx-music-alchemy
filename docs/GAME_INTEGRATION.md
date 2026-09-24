@@ -64,6 +64,6 @@ The reference scheduler is host-tested. No Z80 build, complete MSX machine emula
 physical MSX validation has been performed for this release. VGM/WAV playback alone does
 not establish correct slot handling, port delays, CPU load, or ROM bank placement.
 
-WAV is a preview at 44.1 kHz / 16-bit mono using emu2149, emu2413 and emu2212. It includes
+WAV is a preview at 44.1 kHz / 16-bit mono using emu2149, ymfm (YM2413) and emu2212. It includes
 one song pass and a short release tail; loops are represented in project/VGM/stream metadata.
 Mixer scaling is fixed; it is not a calibrated model of a particular MSX's analog output.
