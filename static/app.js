@@ -4,8 +4,8 @@ const colors={PSG:'#81b4de',OPLL:'#a5b3d6',SCC:'#89b4c4'}, names=['C','C♯','D'
 const noteName=n=>names[((n%12)+12)%12]+(Math.floor(n/12)-1);
 let song,revision=0,token='',trackIndex=0,selected=null,page=0,grid=24,topPitch=83,view='roll',solo=null;
 let undo=[],redo=[],saveTimer=null,dirty=false,saving=false,conflict=false,drag=null,epoch=0;
-let masterGain=null,previewBoost=1;
-let stepRows=[],stepFollowRow=null;
+let masterGain=null,previewBoost=1,livePlayer=null,liveLimiter=null;
+let stepRows=[],stepFollowRow=null,editRange=null,rangeDrag=null;
 let audioContext=null,source=null,playing=false,playStart=0,playOffset=0,renderId=0;
 // BEGIN PREVIEW CACHE
 class PreviewCache {
@@ -21,16 +21,7 @@ class PreviewCache {
  }
 }
 // END PREVIEW CACHE
-const previewCache=new PreviewCache(async key=>{
- const response=await api('/api/render',{song:JSON.parse(key)});
- return {bytes:await response.arrayBuffer(),buffer:null,gain:null};
-});
-let previewTimer=null;
-function playbackSong(){const p=clone(song);if(solo!==null)p.tracks.forEach((t,i)=>t.mute=i!==solo);return p;}
-function schedulePreview(){
- clearTimeout(previewTimer);
- previewTimer=setTimeout(()=>{if(song&&!playing)previewCache.get(JSON.stringify(playbackSong())).catch(()=>{});},800);
-}
+function schedulePreview(){}
 const track=()=>song.tracks[trackIndex], end=()=>song.bars*384;
 const drumKeys={6:[36],7:[38,42],8:[45,49]}, drumNames={36:'バスドラム',38:'スネア',42:'ハイハット',45:'タム',49:'シンバル'};
 const isPsgDrum=()=>track().chip==='PSG'&&track().psgMode==='drums';
@@ -45,7 +36,7 @@ async function api(path,data){
 }
 function snapshot(){return JSON.stringify(song);}
 function checkpoint(){undo.push(snapshot());if(undo.length>80)undo.shift();redo=[];}
-function changed(){epoch++;dirty=true;conflict=false;stop();draw();queueSave();}
+function changed(liveMix=false,keepAudition=false){epoch++;dirty=true;conflict=false;if(liveMix&&playing&&livePlayer)livePlayer.setMix(song,solo);else stop(keepAudition);draw();queueSave();}
 function queueSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveState().catch(e=>status(e.message,true)),350);}
 async function saveState(){
  if(!dirty||saving||conflict)return;saving=true; const sent=epoch;let failed=false;
@@ -53,7 +44,7 @@ async function saveState(){
  catch(e){failed=true;if(e.http===409){conflict=true;status('AIまたは別画面と競合しました。JSON保存で退避してからページを再読込してください。',true);}throw e;}
  finally{saving=false;if(dirty&&!conflict&&!failed)queueSave();}
 }
-function edit(fn){checkpoint();fn();changed();}
+function edit(fn,liveMix=false){checkpoint();fn();changed(liveMix);}
 function refreshInputs(){
  $('title').value=song.title;$('bpm').value=song.bpm;$('bars').value=song.bars;$('hz').value=song.hz;$('loop').checked=song.loop;$('loopStart').value=Math.floor(song.loopStart/384)+1;
  $('page').replaceChildren();for(let i=0;i<song.bars;i++){const o=new Option(String(i+1).padStart(2,'0'),i);$('page').add(o);}$('page').value=page;
@@ -65,9 +56,9 @@ function drawTracks(){
   song.tracks.forEach((t,i)=>{if(t.chip!==chip)return;const row=document.createElement('div');row.className='track'+(trackIndex===i?' selected':'')+(t.mute?' muted':'');row.style.setProperty('--chip',colors[chip]);
    const no=document.createElement('span');no.className='track-number';no.textContent=String(t.channel+1).padStart(2,'0');
    const name=document.createElement('span');name.className='track-name';name.textContent=t.name;name.title=t.name;
-   const mute=document.createElement('button');mute.textContent='M';mute.classList.toggle('on',t.mute);mute.title=t.name+'をミュート';mute.onclick=e=>{e.stopPropagation();edit(()=>t.mute=!t.mute);};
-   const s=document.createElement('button');s.textContent='S';s.classList.toggle('on',solo===i);s.title=t.name+'をソロ試聴';s.onclick=e=>{e.stopPropagation();solo=solo===i?null:i;stop();drawTracks();schedulePreview();};
-   row.append(no,name,mute,s);row.onclick=()=>{trackIndex=i;selected=null;if(isDrum()){topPitch=59;$('octave').value=48;}draw();};container.append(row);
+   const mute=document.createElement('button');mute.textContent='M';mute.classList.toggle('on',t.mute);mute.title=t.name+'をミュート';mute.onclick=e=>{e.stopPropagation();edit(()=>t.mute=!t.mute,true);};
+   const s=document.createElement('button');s.textContent='S';s.classList.toggle('on',solo===i);s.title=t.name+'をソロ試聴';s.onclick=e=>{e.stopPropagation();solo=solo===i?null:i;if(livePlayer)livePlayer.setMix(song,solo);drawTracks();};
+   row.append(no,name,mute,s);row.onclick=()=>{trackIndex=i;selected=null;editRange=null;if(isDrum()){topPitch=59;$('octave').value=48;}draw();};container.append(row);
   });
  }
 }
@@ -79,7 +70,11 @@ function drawOverview(){
   b.onclick=()=>{page=i;$('page').value=i;draw();};$('overview').append(b);
  }$('overview-info').textContent=`${song.bars} BARS · 4/4 · ${Math.round(end()/96*60/song.bpm)} SEC`;
 }
-function drawRoll(){
+function drawRange(){
+ const el=$('range-selection');el.hidden=!editRange||editRange.to<=page*384||editRange.from>=(page+1)*384;
+ if(!el.hidden){const a=Math.max(0,editRange.from-page*384),b=Math.min(384,editRange.to-page*384);el.style.left=a/384*100+'%';el.style.width=(b-a)/384*100+'%';}
+}
+function drawRoll(){drawRange();
  const piano=$('piano'),lines=$('grid-lines');piano.replaceChildren();lines.replaceChildren();$('ruler-beats').replaceChildren();
  for(let i=0;i<4;i++){const s=document.createElement('span');s.textContent=`${page+1}.${i+1}`;$('ruler-beats').append(s);}
  for(let i=0;i<24;i++){
@@ -151,21 +146,24 @@ function insert(pitch,start){
  if(!fits(n)){status('音が重なるか、曲の範囲外です。別チャンネル・音長を選んでください。',true);return false;}
  edit(()=>{track().notes.push(n);track().notes.sort((a,b)=>a.start-b.start);selected=n.id;});return true;
 }
-$('roll').onpointerdown=e=>{if(e.target.closest('.note')||e.button!==0)return;const r=$('roll').getBoundingClientRect();insert(topPitch-Math.floor((e.clientY-r.top)/16),page*384+Math.floor((e.clientX-r.left)/r.width*384/grid)*grid);};
+$('roll').onpointerdown=e=>{if(e.target.closest('.note')||e.button!==0)return;
+ if(e.shiftKey){e.preventDefault();const r=$('roll').getBoundingClientRect(),tick=page*384+Math.floor((e.clientX-r.left)/r.width*384/grid)*grid;rangeDrag={anchor:tick};editRange={from:tick,to:Math.min(end(),tick+grid)};drawRange();return;}
+ editRange=null;const r=$('roll').getBoundingClientRect();insert(topPitch-Math.floor((e.clientY-r.top)/16),page*384+Math.floor((e.clientX-r.left)/r.width*384/grid)*grid);};
 function startNoteDrag(e,n){
- if(e.button!==0)return;e.preventDefault();e.stopPropagation();selected=n.id;
- drag={id:n.id,before:snapshot(),original:clone(n),x:e.clientX,y:e.clientY,width:$('roll').getBoundingClientRect().width,resize:e.target.classList.contains('resize'),changed:false};drawInspector();drawRoll();
+ if(e.button!==0)return;e.preventDefault();e.stopPropagation();stop();selected=n.id;editRange=null;
+ drag={id:n.id,before:snapshot(),original:clone(n),x:e.clientX,y:e.clientY,width:$('roll').getBoundingClientRect().width,resize:e.target.classList.contains('resize'),lastPitch:n.pitch,changed:false};if(!drag.resize)auditionNote(n);drawInspector();drawRoll();
 }
 window.addEventListener('pointermove',e=>{
+ if(rangeDrag){const r=$('roll').getBoundingClientRect(),tick=page*384+Math.max(0,Math.min(384-grid,Math.floor((e.clientX-r.left)/r.width*384/grid)*grid));editRange={from:Math.min(rangeDrag.anchor,tick),to:Math.min(end(),Math.max(rangeDrag.anchor,tick)+grid)};drawRange();return;}
  if(!drag)return;const n=track().notes.find(n=>n.id===drag.id);const dx=Math.round((e.clientX-drag.x)/drag.width*384/grid)*grid;
  const candidate={...drag.original};if(drag.resize)candidate.duration=Math.max(grid,drag.original.duration+dx);else{candidate.start=drag.original.start+dx;candidate.pitch=drag.original.pitch-Math.round((e.clientY-drag.y)/16);}
- if(fits(candidate,n.id)){Object.assign(n,candidate);drag.changed=true;drawRoll();drawInspector();}
+ if(fits(candidate,n.id)){Object.assign(n,candidate);drag.changed=true;if(!drag.resize&&n.pitch!==drag.lastPitch){drag.lastPitch=n.pitch;auditionNote(n);}drawRoll();drawInspector();}
 });
-window.addEventListener('pointerup',()=>{if(!drag)return;const d=drag;drag=null;if(d.changed&&d.before!==snapshot()){undo.push(d.before);redo=[];track().notes.sort((a,b)=>a.start-b.start);changed();}});
+window.addEventListener('pointerup',()=>{rangeDrag=null;if(!drag)return;const d=drag;drag=null;if(d.changed&&d.before!==snapshot()){undo.push(d.before);redo=[];track().notes.sort((a,b)=>a.start-b.start);changed(false,true);}});
 function stepNote(pitch){if(!validDrum(pitch)){status('このリズムトラックのドラム音を選んでください。',true);return;}let cursor=+$('step-cursor').value;const existing=track().notes.find(n=>n.start===cursor);if(existing){const n={...existing,pitch};edit(()=>{Object.assign(existing,n);selected=n.id;});$('step-cursor').value=Math.min(end()-1,cursor+ +$('length').value);}else if(insert(pitch,cursor))$('step-cursor').value=Math.min(end()-1,cursor+ +$('length').value);}
 function deleteSelected(){if(!selected)return;edit(()=>{track().notes=track().notes.filter(n=>n.id!==selected);selected=null;});}
 function history(direction){const a=direction==='undo'?undo:redo,b=direction==='undo'?redo:undo;if(!a.length)return;b.push(snapshot());song=JSON.parse(a.pop());selected=null;changed();}
-function stop(){clearStepPlayback();const wasPlaying=playing;renderId++;playing=false;if(source){try{source.stop();}catch{}source=null;}$('play').textContent='▶';$('play').disabled=false;$('playhead').style.display='none';$('time').textContent='001 : 01';if(wasPlaying)status('停止しました。');}
+function stop(keepAudition=false){if(keepAudition!==true)stopAudition();if(livePlayer){livePlayer.stop();livePlayer=null;}clearStepPlayback();const wasPlaying=playing;renderId++;playing=false;if(source){try{source.stop();}catch{}source=null;}$('play').textContent='▶';$('play').disabled=false;$('playhead').style.display='none';$('time').textContent='001 : 01';if(wasPlaying)status('停止しました。');}
 function previewGain(buffer){
  let peak=0;
  for(let ch=0;ch<buffer.numberOfChannels;ch++){
@@ -182,24 +180,28 @@ function updateMaster(){
  if(masterGain)masterGain.gain.setTargetAtTime(previewBoost*value,audioContext.currentTime,.025);
 }
 async function play(){
- if(playing){stop();return;}const id=++renderId;
- audioContext??=new AudioContext();await audioContext.resume();$('play').disabled=true;status('音源をレンダリングしています…');
+ stopAudition();if(playing){stop();return;}const id=++renderId;
+ audioContext??=new AudioContext();await audioContext.resume();$('play').disabled=true;status('音源を起動しています…');
  try{
-  const p=playbackSong();const prepared=await previewCache.get(JSON.stringify(p));if(id!==renderId)return;
-  if(!prepared.buffer){prepared.buffer=await audioContext.decodeAudioData(prepared.bytes.slice(0));prepared.gain=previewGain(prepared.buffer);}
-  const buffer=prepared.buffer;if(id!==renderId)return;
-  previewBoost=prepared.gain;
-  if(!masterGain){masterGain=audioContext.createGain();masterGain.connect(audioContext.destination);}
+  previewBoost=8;
+  if(!masterGain){
+   masterGain=audioContext.createGain();liveLimiter=audioContext.createDynamicsCompressor();
+   liveLimiter.threshold.value=-1;liveLimiter.knee.value=0;liveLimiter.ratio.value=20;
+   liveLimiter.attack.value=.003;liveLimiter.release.value=.1;
+   masterGain.connect(liveLimiter);liveLimiter.connect(audioContext.destination);
+  }
   masterGain.gain.cancelScheduledValues(audioContext.currentTime);
   masterGain.gain.setValueAtTime(previewBoost*Number($('master-volume').value)/100,audioContext.currentTime);
-  source=audioContext.createBufferSource();source.buffer=buffer;source.connect(masterGain);source.loop=p.loop;
-  source.loopStart=Math.round(p.loopStart/96*60/p.bpm*p.hz)/p.hz;source.loopEnd=Math.round(p.bars*4*60/p.bpm*p.hz)/p.hz;
-  playStart=audioContext.currentTime;playOffset=page*4*60/p.bpm;source.start(0,playOffset);playing=true;$('play').textContent='Ⅱ';status('再生中 · PSG / OPLL / SCC エミュレーション');
-  source.onended=()=>{if(playing&&!p.loop)stop();};requestAnimationFrame(animate);
- }finally{if(id===renderId)$('play').disabled=false;}
+  const current=new LivePlayer(audioContext,masterGain,api,token,()=>{if(id===renderId)stop();},e=>{if(id===renderId){stop();status(e.message,true);}});
+  livePlayer=current;current.setMix(song,solo);playOffset=page*4*60/song.bpm;
+  await current.start(clone(song),page*384);if(id!==renderId){current.stop();return;}
+  playing=true;$('play').textContent='Ⅱ';status('再生中 · リアルタイム音源 · M / S は停止せず反映');requestAnimationFrame(animate);
+ }catch(e){if(id===renderId)stop();throw e;}
+ finally{if(id===renderId)$('play').disabled=false;}
 }
+
 function animate(){
- if(!playing)return;let secs=audioContext.currentTime-playStart+playOffset,total=end()/96*60/song.bpm;
+ if(!playing)return;$('time').dataset.audioSamples=String(livePlayer?.samples||0);$('time').dataset.underruns=String(livePlayer?.underruns||0);let secs=(livePlayer?.samples||0)/44100+playOffset,total=end()/96*60/song.bpm;
  if(song.loop&&secs>=total){const begin=song.loopStart/96*60/song.bpm;secs=begin+(secs-total)%(total-begin);}
  const tick=secs*song.bpm/60*96;const bar=Math.floor(tick/384);$('time').textContent=String(bar+1).padStart(3,'0')+' : '+String(Math.floor(tick%384/96)+1).padStart(2,'0');
  if(bar<song.bars&&bar!==page){page=bar;drawOverview();drawRoll();$('page').value=page;}
@@ -296,3 +298,56 @@ window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,select
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 async function poll(){if(dirty||saving||drag||waveDrawing||document.querySelector('dialog[open]')||document.activeElement.matches('input,textarea,select'))return;try{const data=await (await api('/api/state')).json();if(data.revision!==revision){stop();song=data.song;revision=data.revision;undo=[];redo=[];selected=null;draw();status('AI / 別画面の変更を反映しました · revision '+revision);}$('connection').textContent='● LOCAL';}catch{$('connection').textContent='● OFFLINE';}}
 safe(async()=>{const info=await (await api('/api/info')).json();token=info.token;info.patches.forEach((name,i)=>{$('instrument').add(new Option(String(i).padStart(2,'0')+' · '+name,i));$('note-instrument').add(new Option(String(i).padStart(2,'0')+' · '+name,i));});const data=await (await api('/api/state')).json();song=data.song;revision=data.revision;draw();status('ローカルで準備完了 · 自動保存 / MCP連携対応');setInterval(poll,2000);})();
+
+// Audition uses the real chip voice, with stale requests discarded during fast drags.
+let auditionSerial=0,auditionAbort=null,auditionSource=null,auditionGain=null;
+const auditionCache=new Map();
+function stopAudition(){auditionSerial++;auditionAbort?.abort();auditionAbort=null;if(auditionSource){try{auditionGain?.gain.setTargetAtTime(0,audioContext.currentTime,.002);auditionSource.stop(audioContext.currentTime+.01);}catch{}auditionSource=null;auditionGain=null;}}
+async function auditionNote(note){
+ if(!$('drag-audition').checked)return;
+ stopAudition();const id=auditionSerial;
+ const t=track(),body={track:Object.fromEntries(['chip','channel','instrument','wave','psgMode','noisePeriod','decayMs'].filter(k=>k in t).map(k=>[k,t[k]])),note:{pitch:note.pitch,velocity:note.velocity},opllPatch:song.opllPatch,opllRhythm:!!song.opllRhythm};
+ for(const k of ['instrument','noisePeriod','decayMs'])if(k in note)body.note[k]=note[k];
+ const key=JSON.stringify(body);
+ try{
+  audioContext??=new AudioContext();await audioContext.resume();if(id!==auditionSerial)return;
+  let buffer=auditionCache.get(key);
+  if(!buffer){
+   auditionAbort=new AbortController();const r=await fetch('/api/audition',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-Token':token},body:key,signal:auditionAbort.signal});
+   if(!r.ok)throw Error((await r.json()).error||'試聴できませんでした。');
+   buffer=await audioContext.decodeAudioData(await r.arrayBuffer());if(id!==auditionSerial)return;
+   if(auditionCache.size>=128)auditionCache.delete(auditionCache.keys().next().value);auditionCache.set(key,buffer);
+  }
+  if(id!==auditionSerial)return;
+  const gain=audioContext.createGain();gain.gain.value=previewGain(buffer)*Number($('master-volume').value)/100;gain.connect(audioContext.destination);
+  const node=audioContext.createBufferSource();node.buffer=buffer;node.connect(gain);auditionSource=node;auditionGain=gain;
+  node.onended=()=>{gain.disconnect();if(auditionSource===node)auditionSource=null;};node.start();$('roll').dataset.auditionPitch=String(note.pitch);$('roll').dataset.auditionCount=String(Number($('roll').dataset.auditionCount||0)+1);
+ }catch(e){if(id===auditionSerial&&e.name!=='AbortError')status('音程試聴: '+e.message,true);}
+}
+$('drag-audition').onchange=()=>{if(!$('drag-audition').checked)stopAudition();};
+let trackEditSource=null;
+function trackEditCandidate(){
+ const all=$('track-edit-scope').value==='all';
+ return transformTrack(song,trackEditSource,{mode:$('track-edit-mode').value,targetId:$('track-edit-target').value,from:all?0:Number($('track-edit-from').value),to:all?end():Number($('track-edit-to').value),shift:Number($('track-edit-shift').value),transpose:Number($('track-edit-transpose').value),volume:Number($('track-edit-volume').value),copyTone:$('track-edit-tone').checked});
+}
+function trackEditInfo(){
+ const copy=$('track-edit-mode').value==='copy';$('track-edit-target-label').hidden=!copy;$('track-edit-tone-label').hidden=!copy;$('track-edit-range').hidden=$('track-edit-scope').value==='all';
+ try{const r=trackEditCandidate();$('track-edit-info').textContent=r.count+'音を'+(copy?'コピー':'変更')+'します。適用後はCtrl+Zで取り消せます。';$('track-edit-apply').disabled=false;}
+ catch(e){$('track-edit-info').textContent=e.message;$('track-edit-apply').disabled=true;}
+}
+$('track-edit-open').onclick=()=>{
+ stop();trackEditSource=track().id;$('track-edit-source').textContent='元トラック: '+track().name;
+ $('track-edit-target').replaceChildren();song.tracks.filter(t=>t.id!==trackEditSource&&t.chip===track().chip).forEach(t=>$('track-edit-target').add(new Option(t.name+(t.notes.length?'（既存 '+t.notes.length+'音）':'（空）'),t.id)));
+ const empty=song.tracks.find(t=>t.id!==trackEditSource&&t.chip===track().chip&&!t.notes.length);if(empty)$('track-edit-target').value=empty.id;
+ $('track-edit-mode').value='copy';$('track-edit-scope').value=editRange?'range':'all';$('track-edit-from').value=editRange?.from??page*384;$('track-edit-to').value=editRange?.to??Math.min(end(),(page+1)*384);
+ $('track-edit-shift').value=0;$('track-edit-transpose').value=0;$('track-edit-volume').value=100;$('track-edit-tone').checked=true;trackEditInfo();$('track-edit-dialog').showModal();
+};
+for(const id of ['mode','target','scope','from','to','shift','transpose','volume','tone'])$('track-edit-'+id).oninput=trackEditInfo;
+$('track-edit-echo').onclick=()=>{$('track-edit-mode').value='copy';$('track-edit-shift').value=24;$('track-edit-volume').value=50;trackEditInfo();};
+$('track-edit-apply').onclick=safe(async()=>{
+ const before=snapshot(),result=trackEditCandidate();$('track-edit-apply').disabled=true;
+ try{await api('/api/validate',{song:result.song});if(snapshot()!==before)throw Error('編集中の内容が変わりました。もう一度操作してください。');
+  edit(()=>{song=result.song;selected=null;editRange=null;});$('track-edit-dialog').close();status(result.count+'音を適用しました。');
+ }catch(e){$('track-edit-info').textContent=e.message;throw e;}
+ finally{if($('track-edit-dialog').open)$('track-edit-apply').disabled=false;}
+});

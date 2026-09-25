@@ -354,3 +354,21 @@ def bundle(song):
             z.write(ROOT/'docs'/name,name)
         z.write(ROOT/'LICENSE','LICENSE')
     return out.getvalue()
+
+
+def audition_song(body):
+    """A short, isolated note with the selected chip voice; never edits the song."""
+    t=copy.deepcopy(body['track']);n=copy.deepcopy(body['note'])
+    p=new_song();p.update(bpm=300,bars=1,loop=False,opllRhythm=bool(body.get('opllRhythm',False)))
+    p['opllPatch']=body['opllPatch']
+    dst=next((x for x in p['tracks'] if x['chip']==t.get('chip') and x['channel']==t.get('channel')),None)
+    if dst is None:raise ValueError('試聴する音源が不正です。')
+    for key in ('instrument','wave','psgMode','noisePeriod','decayMs'):
+        if key in t:dst[key]=t[key]
+    dst['notes']=[dict(id='audition',start=0,duration=96,pitch=n['pitch'],velocity=n['velocity'])]
+    for key in ('instrument','noisePeriod','decayMs'):
+        if key in n:dst['notes'][0][key]=n[key]
+    if dst['chip']=='SCC' and dst['channel']>=3:
+        for x in p['tracks']:
+            if x['chip']=='SCC' and x['channel']>=3:x['wave']=dst['wave'][:]
+    return validate(p)

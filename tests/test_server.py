@@ -52,6 +52,29 @@ class IntegrationTests(unittest.TestCase):
         p=core.demo_song();p['hz']=50
         with self.assertRaises(HTTPError) as caught:self.request('/api/export',dict(song=p,format='mgs'))
         self.assertEqual(caught.exception.code,400)
+    def test_live_endpoints_and_authorization(self):
+        song=core.demo_song()
+        with self.assertRaises(HTTPError) as caught:
+            self.request('/api/live/start',dict(song=song),{'X-Studio-Token':'wrong'})
+        self.assertEqual(caught.exception.code,403)
+        with self.request('/api/live/start',dict(song=song)) as r: key=json.load(r)['session']
+        try:
+            with self.request('/api/live/pull',dict(session=key,masks=[0,0,0])) as r:
+                self.assertEqual(len(r.read()),4*735*2)
+            with self.request('/api/live/pull',dict(session=key,masks=[7,511,31])) as r:
+                self.assertEqual(len(r.read()),4*735*2)
+        finally:
+            with self.request('/api/live/stop',dict(session=key)) as r:self.assertTrue(json.load(r)['stopped'])
+        with self.request('/live-worklet.js') as r:self.assertIn(b'registerProcessor',r.read())
+
+    def test_audition_does_not_save(self):
+        with self.request('/api/state') as r:before=json.load(r)
+        p=core.new_song()
+        body=dict(track=p['tracks'][3],note=dict(pitch=72,velocity=10),opllPatch=p['opllPatch'])
+        with self.request('/api/audition',body) as r:
+            self.assertEqual(r.headers['Content-Type'],'audio/wav');self.assertTrue(r.read().startswith(b'RIFF'))
+        with self.request('/api/state') as r:self.assertEqual(json.load(r),before)
+
     def test_mml_error_keeps_editor_unchanged(self):
         with self.request('/api/state') as r:before=json.load(r)
         with self.assertRaises(HTTPError):self.request('/api/mml',{'text':'1 v12 c4 h1,2,3,4'})

@@ -1,6 +1,8 @@
-# MSX Music Alchemy v0.6.0
+# MSX Music Alchemy v0.8.0 — Human UI Update 1
 
-v0.6.0 adds composite bass audition, per-note OPLL instruments, delayed vibrato, detune, pitch slides, and a read-only MCP expression preview. Expression exports to WAV/VGM/register streams; MGS rejects unsupported expression.
+v0.8.0 adds track/range copy, bulk timing and volume edits, echo setup, and chip-voice audition while dragging notes. It retains real-time local chip playback. Mute and solo can be switched without stopping the music. Note and instrument edits still stop playback; file exports retain their existing rendering path.
+
+Human UI Update 1 は、Kanonが実際に編集して気づいた使い勝手を改善する最初の更新です。今後もKanonの実使用で得たフィードバックを中心に、人間が編集しやすいUIを改善していきます。
 
 **Turn ideas into chip music.** A local-first PSG / OPLL / SCC music editor with a piano roll,
 step entry, game-ready data exports, and an MCP server for AI-assisted composition.
@@ -116,6 +118,6 @@ OPLLの再生エンジンをymfmへ変更し、旧エンジンで発音時に聞
 - PSGノイズ／ドラムはWAV・VGM・レジスタ出力対応。MGS出力は未対応です。
 - この版のWindows ZIPはエディタのみ。楽曲サンプルはリポジトリのsamplesを参照してください。
 
-## v0.6.0 再生開始の高速化
+## v0.7.0 リアルタイム試聴
 
-読み込み・編集後に試聴音声を事前生成し、同じ楽曲の再生では再利用します。音符・音色・ミュート・ソロの変更は再生成に反映されます。準備前の再生では生成完了まで待機します。曲のタイミングと書き出し音声は変更しません。
+曲全体を事前に音声化せず、PSG・OPLL・SCCの音源エンジンを動かしながら試聴します。M（ミュート）とS（ソロ）は演奏を止めずに切り替えできます。音符・音色・テンポなどの編集は停止して次回再生へ反映します。WAV・VGM等の書き出しは従来の処理です。

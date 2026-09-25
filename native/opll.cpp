@@ -5,9 +5,21 @@
 #include <new>
 
 namespace {
+class LiveYm2413 : public ymfm::ym2413 {
+public:
+    using ymfm::ym2413::ym2413;
+    unsigned muted = 0;
+    void generate(output_data *out) {
+        if (!muted) { ymfm::ym2413::generate(out); return; }
+        m_fm.clock(fm_engine::ALL_CHANNELS);
+        m_fm.output(out->clear(), 5, 256, fm_engine::ALL_CHANNELS & ~muted);
+        out->data[0] = (out->data[0] * 128) / 9;
+        out->data[1] = (out->data[1] * 128) / 9;
+    }
+};
 class Opll : public ymfm::ymfm_interface {
 public:
-    ymfm::ym2413 chip;
+    LiveYm2413 chip;
     ymfm::ym2413::output_data output{};
     const double ratio;
     uint64_t samples = 0, native = 0;
@@ -80,3 +92,5 @@ extern "C" void msx_opll_write(void *p, unsigned reg, unsigned value) {
 }
 extern "C" double msx_opll_calc(void *p) { return static_cast<Opll *>(p)->sample(); }
 extern "C" void msx_opll_delete(void *p) { delete static_cast<Opll *>(p); }
+
+extern "C" void msx_opll_mask(void *p, unsigned mask) { static_cast<Opll *>(p)->chip.muted = mask & 511; }
