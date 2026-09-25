@@ -106,7 +106,8 @@ function drawInspector(){
  $('opll-rhythm').checked=!!song.opllRhythm;$('rhythm-help').hidden=!song.opllRhythm;$('instrument').disabled=isDrum();
  $('instrument').value=t.instrument;$('patch').value=song.opllPatch.map(v=>v.toString(16).padStart(2,'0')).join(' ');drawWave();
  $('psg-mode').value=t.psgMode||'tone';$('noise-period').value=t.noisePeriod||16;$('noise-period').disabled=t.psgMode!=='noise';$('psg-decay').value=t.decayMs||0;$('psg-decay').disabled=!['noise','drums'].includes(t.psgMode);
- const n=t.notes.find(n=>n.id===selected);$('note-decay-label').hidden=!n||t.chip!=='PSG'||!['noise','drums'].includes(t.psgMode);$('note-decay').value=n?.decayMs||0;$('note-controls').hidden=!n;$('note-empty').hidden=!!n;
+ const n=t.notes.find(n=>n.id===selected);$('note-instrument-label').hidden=!n||t.chip!=='OPLL'||isDrum();$('note-instrument').value=n?.instrument??'';$('note-decay-label').hidden=!n||t.chip!=='PSG'||!['noise','drums'].includes(t.psgMode);$('note-decay').value=n?.decayMs||0;$('note-controls').hidden=!n;$('note-empty').hidden=!!n;
+ $('note-expression').hidden=!n||t.chip!=='OPLL'||isDrum();if(n)for(const [k,d] of [['detuneCents',0],['vibratoDepth',0],['vibratoRate',50],['vibratoDelayMs',250],['portamentoMs',0],['portamentoFrom',n.pitch]])$('expr-'+k).value=n[k]??d;
  if(n)for(const field of ['pitch','start','duration','velocity'])$('note-'+field).value=n[field];
  $('note-count').textContent=t.notes.length+' NOTES';$('undo').disabled=!undo.length;$('redo').disabled=!redo.length;
 }
@@ -220,12 +221,56 @@ for(const field of ['bpm','hz'])$(field).onchange=e=>{const v=+e.target.value;if
 $('bars').onchange=e=>{const v=+e.target.value;if(!Number.isInteger(v)||v<1||v>64||song.tracks.some(t=>t.notes.some(n=>n.start+n.duration>v*384))){status('ノートのある小節は削れません。先にノートを移動・削除してください。',true);draw();return;}edit(()=>{song.bars=v;song.loopStart=Math.min(song.loopStart,(v-1)*384);});};
 $('loop').onchange=e=>edit(()=>song.loop=e.target.checked);
 $('loopStart').onchange=e=>{const v=(+e.target.value-1)*384;if(!Number.isInteger(v)||v<0||v>=end()){draw();return;}edit(()=>song.loopStart=v);};
+// BEGIN COMPOSITE RECIPE
+function compositeBass(input,sourceId,targetId,attenuation){
+ const p=structuredClone(input), src=p.tracks.find(t=>t.id===sourceId), dst=p.tracks.find(t=>t.id===targetId);
+ const melodic=t=>t&&t.chip==='OPLL'&&!(p.opllRhythm&&t.channel>=6);
+ if(!melodic(src)||!melodic(dst)||sourceId===targetId)throw Error('別のOPLL旋律トラックを選んでください。');
+ if(!src.notes.length||src.mute)throw Error('音符のある、ミュートされていない元パートを選んでください。');
+ if(dst.notes.length)throw Error('追加先に音符があります。上書きはできません。');
+ if(!Number.isInteger(attenuation)||attenuation<0||attenuation>14)throw Error('音量差は0〜14の整数です。');
+ src.instrument=14;dst.instrument=10;dst.mute=false;dst.name=(src.name.slice(0,55)+' / Synth layer');
+ dst.notes=src.notes.filter(n=>n.velocity>attenuation).map(n=>({...n,id:'layer-'+n.id,velocity:n.velocity-attenuation}));
+ if(!dst.notes.length)throw Error('追加音がすべて無音になります。音量差を小さくしてください。');
+ return p;
+}
+// END COMPOSITE RECIPE
+let layerSourceId=null,layerAudition=null,layerRequest=0;
+function stopLayer(){layerRequest++;if(layerAudition){try{layerAudition.stop();}catch{}layerAudition=null;}}
+function layerCandidate(){return compositeBass(song,layerSourceId,$('layer-target').value,Number($('layer-attenuation').value));}
+function layerInfo(){
+ stopLayer();try{const p=layerCandidate(),t=p.tracks.find(t=>t.id===$('layer-target').value);$('layer-info').textContent='追加 '+t.notes.length+'音 · OPLL計2ch · 適用は取り消し可能';$('layer-preview').disabled=false;$('layer-apply').disabled=false;}
+ catch(e){$('layer-info').textContent=e.message;$('layer-preview').disabled=true;$('layer-apply').disabled=true;}
+}
+$('layer-open').onclick=()=>{
+ stop();layerSourceId=track().id;$('layer-target').replaceChildren();
+ song.tracks.filter(t=>t.id!==layerSourceId&&t.chip==='OPLL'&&!(song.opllRhythm&&t.channel>=6)&&!t.notes.length).forEach(t=>$('layer-target').add(new Option(t.name,t.id)));
+ layerInfo();if(!$('layer-target').options.length)$('layer-info').textContent='空きOPLL旋律トラックがありません。既存パートは上書きしません。';$('layer-dialog').showModal();
+};
+$('layer-target').onchange=layerInfo;$('layer-attenuation').oninput=layerInfo;
+$('layer-stop').onclick=stopLayer;$('layer-dialog').addEventListener('close',stopLayer);
+$('layer-preview').onclick=safe(async()=>{
+ stopLayer();const id=layerRequest,p=layerCandidate(),src=p.tracks.find(t=>t.id===layerSourceId),start=src.notes[0].start;
+ const limit=Math.ceil(8*p.bpm*96/60);p.loop=false;p.loopStart=0;p.bars=Math.min(64,Math.ceil(limit/384));
+ p.tracks.forEach(t=>{t.notes=t.notes.filter(n=>n.start<start+limit&&n.start+n.duration>start).map(n=>({...n,start:Math.max(0,n.start-start),duration:Math.min(n.start+n.duration-start,limit)-Math.max(0,n.start-start)}));});
+ $('layer-info').textContent='試聴を準備しています…';audioContext??=new AudioContext();await audioContext.resume();
+ const r=await api('/api/render',{song:p}),buffer=await audioContext.decodeAudioData(await r.arrayBuffer());if(id!==layerRequest||!$('layer-dialog').open)return;
+ const gain=audioContext.createGain();gain.gain.value=previewGain(buffer)*Number($('master-volume').value)/100;gain.connect(audioContext.destination);
+ layerAudition=audioContext.createBufferSource();layerAudition.buffer=buffer;layerAudition.connect(gain);layerAudition.onended=()=>gain.disconnect();layerAudition.start(0,0,Math.min(8,buffer.duration));$('layer-info').textContent='複合音色を含む全体を試聴中 · 楽曲は未変更';
+});
+$('layer-apply').onclick=safe(async()=>{
+ const p=layerCandidate(),before=snapshot();$('layer-apply').disabled=true;
+ try{await api('/api/validate',{song:p});if(!$('layer-dialog').open||snapshot()!==before)return;stopLayer();edit(()=>{song=p;selected=null;});$('layer-dialog').close();}
+ finally{if($('layer-dialog').open)layerInfo();}
+});
 $('track-name').onchange=e=>edit(()=>track().name=e.target.value);
 $('opll-rhythm').onchange=e=>{const enabled=e.target.checked;if(song.tracks.some(t=>t.chip==='OPLL'&&t.channel>=6&&t.notes.length)){status('モード切替前にOPLL 7〜9のノートを退避して空にしてください。',true);drawInspector();return;}edit(()=>song.opllRhythm=enabled);};
 $('psg-mode').onchange=e=>{const mode=e.target.value;if(mode==='drums'&&track().notes.some(n=>![36,38,42,45,49].includes(n.pitch))){status('ドラムキットはMIDI 36/38/42/45/49のノートで使用してください。',true);drawInspector();return;}edit(()=>{track().psgMode=mode;if(mode==='tone')track().notes.forEach(n=>{delete n.noisePeriod;delete n.decayMs;});});};
 $('psg-decay').onchange=e=>edit(()=>track().decayMs=+e.target.value);
 $('note-decay').onchange=e=>edit(()=>{const n=track().notes.find(n=>n.id===selected);if(n)n.decayMs=+e.target.value;});
 $('noise-period').onchange=e=>edit(()=>track().noisePeriod=+e.target.value);
+for(const key of ['detuneCents','vibratoDepth','vibratoRate','vibratoDelayMs','portamentoMs','portamentoFrom'])$('expr-'+key).onchange=e=>{if(!e.target.checkValidity()){drawInspector();return;}edit(()=>{const n=track().notes.find(n=>n.id===selected);if(n){n[key]=Number(e.target.value);if(key==='vibratoDepth'){n.vibratoDelayMs??=250;n.vibratoRate??=50;}}});};
+$('note-instrument').onchange=e=>edit(()=>{const n=track().notes.find(n=>n.id===selected);if(!n)return;if(e.target.value==='')delete n.instrument;else n.instrument=Number(e.target.value);});
 $('instrument').onchange=e=>edit(()=>track().instrument=+e.target.value);
 $('patch').onchange=e=>{const values=e.target.value.trim().split(/\s+/);if(values.length!==8||values.some(v=>!/^[0-9a-f]{2}$/i.test(v))){status('OPLL音色は2桁の16進数を8個、空白で区切ってください。',true);drawInspector();return;}edit(()=>song.opllPatch=values.map(v=>parseInt(v,16)));};
 for(const field of ['pitch','start','duration','velocity'])$('note-'+field).onchange=e=>{const n=track().notes.find(n=>n.id===selected),v=+e.target.value;if(!n)return;const candidate={...n,[field]:v};if(!Number.isInteger(v)||!fits(candidate,n.id)){status('値が範囲外か、他の音と重なります。',true);drawInspector();return;}edit(()=>Object.assign(n,candidate));};
@@ -250,4 +295,4 @@ $('file').onchange=safe(async e=>{const file=e.target.files[0];if(!file)return;i
 window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,select')||document.querySelector('dialog[open]'))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();history(e.shiftKey?'redo':'undo');return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();history('redo');return;}if(e.code==='Space'){e.preventDefault();safe(play)();}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();}if(view==='step'&&!e.ctrlKey&&!e.metaKey){const i='zsxdcvgbhnjm'.indexOf(e.key.toLowerCase());if(i>=0&&e.key.length===1){e.preventDefault();stepNote(topPitch-23+i);}}});
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 async function poll(){if(dirty||saving||drag||waveDrawing||document.querySelector('dialog[open]')||document.activeElement.matches('input,textarea,select'))return;try{const data=await (await api('/api/state')).json();if(data.revision!==revision){stop();song=data.song;revision=data.revision;undo=[];redo=[];selected=null;draw();status('AI / 別画面の変更を反映しました · revision '+revision);}$('connection').textContent='● LOCAL';}catch{$('connection').textContent='● OFFLINE';}}
-safe(async()=>{const info=await (await api('/api/info')).json();token=info.token;info.patches.forEach((name,i)=>$('instrument').add(new Option(String(i).padStart(2,'0')+' · '+name,i)));const data=await (await api('/api/state')).json();song=data.song;revision=data.revision;draw();status('ローカルで準備完了 · 自動保存 / MCP連携対応');setInterval(poll,2000);})();
+safe(async()=>{const info=await (await api('/api/info')).json();token=info.token;info.patches.forEach((name,i)=>{$('instrument').add(new Option(String(i).padStart(2,'0')+' · '+name,i));$('note-instrument').add(new Option(String(i).padStart(2,'0')+' · '+name,i));});const data=await (await api('/api/state')).json();song=data.song;revision=data.revision;draw();status('ローカルで準備完了 · 自動保存 / MCP連携対応');setInterval(poll,2000);})();

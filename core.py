@@ -77,6 +77,15 @@ def validate(song):
             if not isinstance(n,dict): raise ValueError('ノートはオブジェクトです。')
             integer(n.get('start'),0,end-1,'開始tick'); integer(n.get('duration'),1,end,'音長tick')
             integer(n.get('pitch'),24,95,'MIDI音程'); integer(n.get('velocity'),1,15,'音量')
+            for key,lo,hi in [('detuneCents',-100,100),('vibratoDepth',0,100),('vibratoRate',1,100),('vibratoDelayMs',0,2000),('portamentoMs',0,2000),('portamentoFrom',24,95)]:
+                if key in n:
+                    integer(n[key],lo,hi,key)
+                    if chip!='OPLL' or (p.get('opllRhythm') and t['channel']>=6):
+                        raise ValueError('Pitch expression requires melodic OPLL')
+            if 'instrument' in n:
+                integer(n['instrument'],0,15,'ノート音色')
+                if chip!='OPLL' or (p.get('opllRhythm') and t['channel']>=6):
+                    raise ValueError('ノート音色はOPLL旋律専用です。')
             if 'noisePeriod' in n:
                 integer(n['noisePeriod'],1,31,'PSG note noise period')
                 if chip!='PSG' or t.get('psgMode') not in ('noise','drums'): raise ValueError('Noise period requires PSG percussion mode')
@@ -210,7 +219,7 @@ def compile_song(song):
                 block+=1; fnum=round(freq*72*2**(19-block)/3579545)
             hi=(fnum>>8)|(block<<1)
             if on:
-                write(f,1,0x30+ch,(t['instrument']<<4)|(15-n['velocity']))
+                write(f,1,0x30+ch,(n.get('instrument',t['instrument'])<<4)|(15-n['velocity']))
                 write(f,1,0x10+ch,fnum&255)
             write(f,1,0x20+ch,hi|(0x10 if on else 0))
         else:
@@ -220,6 +229,29 @@ def compile_song(song):
                 write(f,2,0x8a+ch,n['velocity']); enabled|=1<<ch
             else: write(f,2,0x8a+ch,0); enabled&=~(1<<ch)
             write(f,2,0x8f,enabled)
+    # Pitch-only updates keep the key on: no envelope retrigger during modulation.
+    for t in p['tracks']:
+        if t['mute'] or t['chip']!='OPLL' or (rhythm and t['channel']>=6): continue
+        ch=t['channel']
+        for n in t['notes']:
+            if not any(n.get(k,0) for k in ('detuneCents','vibratoDepth','portamentoMs')): continue
+            first,last=frame(n['start']),frame(n['start']+n['duration'])
+            for f in range(first,last):
+                ms=(f-first)*1000/hz
+                cents=n.get('detuneCents',0)
+                glide=n.get('portamentoMs',0)
+                if glide: cents+=(n.get('portamentoFrom',n['pitch'])-n['pitch'])*100*max(0,1-ms/glide)
+                delay=n.get('vibratoDelayMs',0)
+                if ms>=delay:
+                    ramp=min(1,(ms-delay)/100)
+                    cents+=n.get('vibratoDepth',0)*ramp*math.sin(2*math.pi*n.get('vibratoRate',50)/10*(ms-delay)/1000)
+                freq=440*2**((n['pitch']-69+cents/100)/12)
+                block=0; fnum=round(freq*72*2**19/3579545)
+                while fnum>511 and block<7:
+                    block+=1; fnum=round(freq*72*2**(19-block)/3579545)
+                fnum=min(511,max(1,fnum))
+                write(f,1,0x10+ch,fnum&255)
+                write(f,1,0x20+ch,(fnum>>8)|(block<<1)|0x10)
     # Silence every chip at the exact song end. OPLL release is retained for WAV only.
     for ch in range(3): write(frames,0,8+ch,0)
     for ch in range(9): write(frames,1,0x20+ch,0)

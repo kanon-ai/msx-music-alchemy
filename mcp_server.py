@@ -24,7 +24,8 @@ def http(path,body=None):
 def tool(name,description,props=None,required=None,read=False):
     return dict(name=name,description=description,inputSchema=dict(type='object',properties=props or {},required=required or [],additionalProperties=False),annotations=dict(readOnlyHint=read,destructiveHint=False,openWorldHint=False))
 TOOLS=[
- tool('get_arrangement_templates','List reusable OPLL echo recipes. Vibrato depth/rate automation is not implemented.',read=True),
+ tool('preview_note_expression','Preview gentle delayed vibrato on long notes of one melodic OPLL track. Read-only; existing expression preserved. Apply returned song with set_song and current revision.',{'song':{'type':'object'},'trackId':{'type':'string'},'startTick':{'type':'integer','minimum':0},'minimumDurationMs':{'type':'integer','minimum':350,'maximum':5000}},['song','trackId'],True),
+ tool('get_arrangement_templates','List reusable OPLL echo recipes. Read get_composition_guide for note pitch expression.',read=True),
  tool('preview_arrangement_template','Return a copied song with an echo on an empty OPLL track. Does not update the editor; inspect report then use set_song.',{'song':{'type':'object'},'preset':{'type':'string','enum':list(PRESETS)},'sourceId':{'type':'string'},'targetId':{'type':'string'}},['song','preset','sourceId','targetId'],True),
  tool('get_song','Get the editor song and revision before changing it. Server must be running.',read=True),
  tool('get_composition_guide','Read schema, timing, channel restrictions, and AI composition workflow.',read=True),
@@ -37,6 +38,17 @@ TOOLS=[
 ]
 
 def call(name,args):
+    if name=='preview_note_expression':
+        p=core.validate(args['song']);t=next((t for t in p['tracks'] if t['id']==args['trackId']),None)
+        if not t or t['chip']!='OPLL' or (p.get('opllRhythm') and t['channel']>=6): raise ValueError('Choose melodic OPLL')
+        start=args.get('startTick',0);minimum=args.get('minimumDurationMs',500)
+        core.integer(start,0,p['bars']*384-1,'startTick');core.integer(minimum,350,5000,'minimumDurationMs')
+        count=0
+        for n in t['notes']:
+            if n['start']>=start and n['duration']*60000/(p['bpm']*96)>=minimum and not any(k in n for k in ('vibratoDepth','vibratoRate','vibratoDelayMs')):
+                n.update(vibratoDepth=18,vibratoRate=48,vibratoDelayMs=240);count+=1
+        core.compile_song(p)
+        return dict(song=p,report=dict(modified=count,trackId=t['id'],depthCents=18,rateHz=4.8,delayMs=240,applied=False))
     if name=='get_arrangement_templates': return dict(presets=PRESETS,notes='Attenuation is OPLL volume steps, not linear percent. ROM flute already has carrier hardware vibrato. Echo needs an empty OPLL voice.')
     if name=='preview_arrangement_template': return apply_template(args['song'],args['preset'],args['sourceId'],args['targetId'])
     if name=='get_song': return http('/api/state')

@@ -52,9 +52,18 @@ Reference: [Yamaha YM2413 application manual](https://www.smspower.org/maxim/Doc
 
 ### Reusable arrangement recipes
 
-Use `get_arrangement_templates` and `preview_arrangement_template` to create quiet echoes on empty OPLL tracks without overwriting source notes. Preview returns a song and report; apply with the current revision through `set_song`. See `CHIPTUNE_TEMPLATES.md` for exact delay/attenuation, rhythm-channel guards and the distinction between existing ROM vibrato and unsupported programmable vibrato.
+Use `get_arrangement_templates` and `preview_arrangement_template` to create quiet echoes on empty OPLL tracks without overwriting source notes. Preview returns a song and report; apply with the current revision through `set_song`. See `CHIPTUNE_TEMPLATES.md` for exact delay/attenuation, rhythm-channel guards and the distinction between existing ROM vibrato and note-level programmable vibrato (see below).
 
 PSG noise: set track psgMode='noise', noisePeriod=1..31 (default 16). Optional note noisePeriod overrides the track. Volume decays per frame. Only one non-muted populated noise track is supported because AY noise is shared. Other PSG tracks retain tone. WAV/VGM/register exports supported; MGS rejects active noise tracks. Removing noise mode requires removing note noisePeriod fields.
 
 ### PSG drum kit and decay
 Use `psgMode: "drums"` for MIDI 36 kick, 38 snare, 42 hat, 45 tom, 49 cymbal. Kick/tom use descending tone pitch; snare combines tone/noise. Only one populated, unmuted noise/drum track is supported. Each track or note may specify `decayMs` (0=automatic/inherit, 1..2000). Notes override tracks; automatic kit lengths are 100/90/40/140/220 ms. Decay ends at the note-off if earlier; timing resolution is the song's 50/60 Hz frame rate. Existing noise tracks without decayMs retain their old envelope. UI has track and selected-note decay controls; step entry supplies named kit keys. MGS export is unsupported for active noise/kit tracks; WAV/VGM/register streams preserve the sound.
+
+
+## OPLL expression
+
+Call `preview_note_expression(song, trackId, startTick, minimumDurationMs)` for a read-only gentle long-note vibrato proposal. It returns copied song/report and never writes editor state. Default minimum is 500ms; use startTick to exclude an introduction. Inspect modified count and audition before set_song with the latest revision. Existing vibrato fields are preserved. Choose a lead or echo explicitly; do not apply to every track or bass by default.
+
+Optional note fields (melodic OPLL only): instrument 0..15, detuneCents -100..100, vibratoDepth 0..100 cents, vibratoRate 1..100 in tenths Hz (48=4.8Hz), vibratoDelayMs 0..2000, portamentoFrom MIDI24..95, portamentoMs 0..2000. Depth/time zero disables. Absent rate=5Hz, absent delay=0; explicitly specify delay240 for delayed vibrato. Depth ramps up over100ms. Detune example: echo +6 cents. Portamento is an explicit start-pitch slide with normal key-on, not legato; use sparingly on connected long notes, about65ms for 1..2-semitone moves. Do not infer portamento use from mixed reference audio alone.
+
+WAV/VGM/register streams include expression at song50/60Hz. MGS rejects note-specific instruments and active expression instead of silently dropping it. Preserve source backup and compare with fixed volume; no-expression songs retain prior register output.

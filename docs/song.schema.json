@@ -161,6 +161,48 @@
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 2000
+                },
+                "instrument": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 15,
+                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                },
+                "detuneCents": {
+                  "type": "integer",
+                  "minimum": -100,
+                  "maximum": 100,
+                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                },
+                "vibratoDepth": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                },
+                "vibratoRate": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100,
+                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                },
+                "vibratoDelayMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2000,
+                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                },
+                "portamentoFrom": {
+                  "type": "integer",
+                  "minimum": 24,
+                  "maximum": 95,
+                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                },
+                "portamentoMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2000,
+                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
                 }
               }
             }
