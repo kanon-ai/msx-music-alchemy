@@ -180,9 +180,12 @@ function updateMaster(){
  if(masterGain)masterGain.gain.setTargetAtTime(previewBoost*value,audioContext.currentTime,.025);
 }
 async function play(){
- stopAudition();if(playing){stop();return;}const id=++renderId;
- audioContext??=new AudioContext();await audioContext.resume();$('play').disabled=true;status('音源を起動しています…');
+ stopAudition();if(playing){stop();return;}if($('play').disabled)return;const id=++renderId;
+ $('play').disabled=true;status('音源を起動しています…');
  try{
+  audioContext??=new AudioContext();await audioContext.resume();if(id!==renderId)return;
+  const connection=await (await api('/api/info')).json();if(id!==renderId)return;
+  token=connection.token;
   previewBoost=8;
   if(!masterGain){
    masterGain=audioContext.createGain();liveLimiter=audioContext.createDynamicsCompressor();

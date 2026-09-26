@@ -29,6 +29,7 @@ class LiveSession:
         self.selected_noise=None;self.restore=[]
         self.hz=d['hz']; self.total=d['frames']; self.loop=d['loop']; self.loop_frame=d['loopFrame']
         self.events=self.variants[None]
+        self.request_lock=threading.Lock(); self.last_request=-1; self.last_pcm=None
         self.cursor=0; self.lock=threading.Lock(); self.touched=time.monotonic(); self.closed=False
         self.proc=subprocess.Popen([str(core.ROOT/'bin'/('msx_render.exe' if sys.platform=='win32' else 'msx_render'))],
             stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
@@ -103,10 +104,17 @@ class LivePool:
             if len(self.sessions)>=4:raise ValueError('再生画面が多すぎます。別画面の再生を停止してください。')
             s=LiveSession(song,start);key=secrets.token_urlsafe(24);self.sessions[key]=s
             return dict(session=key,sampleRate=44100,hz=s.hz)
-    def pull(self,key,masks):
+    def pull(self,key,masks,request_id=None):
         with self.lock:s=self.sessions.get(key)
         if s is None:raise ValueError('再生セッションが終了しました。再生ボタンで再開してください。')
-        return s.pull(masks)
+        if request_id is None:return s.pull(masks)
+        if type(request_id) is not int or request_id<0:raise ValueError('Invalid audio request ID')
+        with s.request_lock:
+            s.touched=time.monotonic()
+            if request_id==s.last_request:return s.last_pcm
+            if request_id!=s.last_request+1:raise ValueError('Audio request out of sequence')
+            pcm=s.pull(masks);s.last_request=request_id;s.last_pcm=pcm
+            return pcm
     def stop(self,key):
         with self.lock:s=self.sessions.pop(key,None)
         if s:s.close()
