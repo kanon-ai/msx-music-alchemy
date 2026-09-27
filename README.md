@@ -1,4 +1,6 @@
-# MSX Music Alchemy v0.9.0 — Human UI Update 2
+# MSX Music Alchemy v0.10.0 — Human UI Update 3
+
+音色作成機能更新: 独立したPSG / OPLL / SCC / OPM音色エディタ、共通ノブUI、SCC波形描画、自作音色ライブラリ、JISキーボード4段48キーの試奏に対応。楽曲と独立して音色を作成できます。パート単位のMML編集も追加し、検証成功時のみ反映します。
 
 Kanonの実際の編集操作をもとに、**パートごとの音色・音量・オクターブを試して決める操作**を中心に改善しました。
 

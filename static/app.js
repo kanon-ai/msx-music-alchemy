@@ -142,6 +142,7 @@ function drawInspector(){
  const n=t.notes.find(n=>n.id===selected);$('note-instrument-label').hidden=!n||t.chip!=='OPLL'||isDrum();$('note-instrument').value=n?.instrument??'';$('note-decay-label').hidden=!n||t.chip!=='PSG'||!['noise','drums'].includes(t.psgMode);$('note-decay').value=n?.decayMs||0;$('note-controls').hidden=!n;$('note-empty').hidden=!!n;
  $('note-expression').hidden=!n||!['OPLL','OPM'].includes(t.chip)||isDrum();if(n)for(const [k,d] of [['detuneCents',0],['vibratoDepth',0],['vibratoRate',50],['vibratoDelayMs',250],['portamentoMs',0],['portamentoFrom',n.pitch]])$('expr-'+k).value=n[k]??d;
  if(n)for(const field of ['pitch','start','duration','velocity'])$('note-'+field).value=n[field];
+ if(view==='sound')drawSoundEditor();
  $('note-count').textContent=t.notes.length+' NOTES';$('undo').disabled=!undo.length;$('redo').disabled=!redo.length;
 }
 function drawStep(){
@@ -178,7 +179,7 @@ function clearStepPlayback(){
 function draw(){
  trackIndex=Math.min(trackIndex,song.tracks.length-1);if(solo!==null&&solo>=song.tracks.length)solo=null;
  schedulePreview();
- page=Math.min(page,song.bars-1);refreshInputs();drawTracks();drawOverview();drawRoll();drawInspector();drawTrackPreview();if(view==='step')drawStep();
+ page=Math.min(page,song.bars-1);refreshInputs();drawTracks();drawOverview();drawRoll();drawInspector();drawTrackPreview();if(view==='step')drawStep();if(view==='mml')drawPartMml();
 }
 function fits(n,ignore=null){return validDrum(n.pitch)&&n.start>=0&&n.duration>=1&&n.start+n.duration<=end()&&n.pitch>=24&&n.pitch<=95&&n.velocity>=1&&n.velocity<=15&&!track().notes.some(x=>x.id!==ignore&&n.start<x.start+x.duration&&n.start+n.duration>x.start);}
 function insert(pitch,start){
@@ -264,13 +265,14 @@ function animate(){
 function download(data,filename){const url=URL.createObjectURL(data),a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 async function exportSong(format){status('出力を作成中…');const response=await api('/api/export',{song,format});const ext={bundle:'.zip',json:'.msx.json',registers:'.registers.json',header:'.h',vgm:'.vgm',mgs:'.mgs',wav:'.wav'}[format];const base=format==='mgs'?(song.title.replace(/[^A-Za-z0-9_]/g,'').slice(0,8).toUpperCase()||'MUSIC'):(song.title.replace(/[^\p{L}\p{N}_-]/gu,'_')||'song');download(await response.blob(),base+ext);status('出力しました · '+format);}
 async function replaceSong(next){await api('/api/validate',{song:next});trackDrafts.clear();edit(()=>{song=next;selected=null;page=0;solo=null;});}
-function drawWave(){const ctx=$('wave-canvas').getContext('2d');ctx.clearRect(0,0,256,100);ctx.strokeStyle='#2d3c45';ctx.beginPath();ctx.moveTo(0,50);ctx.lineTo(256,50);ctx.stroke();ctx.strokeStyle=colors.SCC;ctx.lineWidth=2;ctx.beginPath();track().wave.forEach((v,i)=>{const y=50-v/128*45;if(i===0)ctx.moveTo(0,y);else ctx.lineTo(i*8,y);ctx.lineTo((i+1)*8,y);});ctx.stroke();}
-let waveDrawing=false,waveBefore=null;
-function wavePoint(e){const rect=$('wave-canvas').getBoundingClientRect(),index=Math.max(0,Math.min(31,Math.floor((e.clientX-rect.left)/rect.width*32))),value=Math.max(-128,Math.min(127,Math.round((.5-(e.clientY-rect.top)/rect.height)*256)));track().wave[index]=value;mirrorWave();drawWave();}
+function drawWave(){const canvas=$('wave-canvas'),ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#344956';ctx.lineWidth=1;ctx.beginPath();for(let i=0;i<=32;i++){const x=i*w/32;ctx.moveTo(x,0);ctx.lineTo(x,h);}for(let i=0;i<=4;i++){ctx.moveTo(0,i*h/4);ctx.lineTo(w,i*h/4);}ctx.stroke();ctx.strokeStyle=colors.SCC;ctx.lineWidth=3;ctx.beginPath();track().wave.forEach((v,i)=>{const y=(127-v)/255*(h-16)+8,x=(i+.5)*w/32;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});ctx.stroke();ctx.fillStyle='#c2ebff';track().wave.forEach((v,i)=>{ctx.beginPath();ctx.arc((i+.5)*w/32,(127-v)/255*(h-16)+8,4,0,Math.PI*2);ctx.fill();});}
+let waveDrawing=false,waveBefore=null,waveLast=null;
+function reshapeWave(wave,previous,index,value){const from=previous?.index??index,first=previous?.value??value,steps=Math.abs(index-from);for(let j=0;j<=steps;j++){const at=from+Math.sign(index-from)*j;wave[at]=steps?(Math.round(first+(value-first)*j/steps)||0):value;}}
+function wavePoint(e){const canvas=$('wave-canvas'),rect=canvas.getBoundingClientRect(),index=Math.max(0,Math.min(31,Math.floor((e.clientX-rect.left)/rect.width*32))),y=(e.clientY-rect.top)/rect.height*canvas.height,value=Math.max(-128,Math.min(127,Math.round(127-(y-8)/(canvas.height-16)*255)));reshapeWave(track().wave,waveLast,index,value);waveLast={index,value};mirrorWave();drawWave();}
 function mirrorWave(){if(track().chip==='SCC'&&track().channel>=3){song.tracks.find(t=>t.chip==='SCC'&&t.channel===(track().channel===3?4:3)).wave=track().wave.slice();}}
-$('wave-canvas').onpointerdown=e=>{waveDrawing=true;waveBefore=snapshot();e.target.setPointerCapture(e.pointerId);wavePoint(e);};
+$('wave-canvas').onpointerdown=e=>{if(e.button!==0||track().chip!=='SCC')return;waveDrawing=true;waveLast=null;waveBefore=snapshot();e.target.setPointerCapture(e.pointerId);wavePoint(e);};
 $('wave-canvas').onpointermove=e=>{if(waveDrawing)wavePoint(e);};
-$('wave-canvas').onpointerup=()=>{if(waveDrawing){waveDrawing=false;undo.push(waveBefore);redo=[];$('wave-preset').value='custom';changed();}};
+$('wave-canvas').onpointerup=()=>{if(waveDrawing){waveDrawing=false;waveLast=null;undo.push(waveBefore);redo=[];$('wave-preset').value='custom';changed();}};
 let sccPresets=[];
 $('wave-preset').onchange=e=>{const kind=e.target.value;const preset=sccPresets.find(p=>p.id===kind);if(preset){edit(()=>{track().wave=preset.wave.slice();mirrorWave();});return;}if(kind==='custom')return;edit(()=>{track().wave=Array.from({length:32},(_,i)=>kind==='square'?(i<16?100:-100):kind==='saw'?i*8-124:kind==='sine'?Math.round(110*Math.sin(i*Math.PI*2/32)):Math.round(110*(1-4*Math.abs(i/32-.5))));mirrorWave();});};
 $('title').onchange=e=>edit(()=>song.title=e.target.value);
@@ -333,7 +335,7 @@ $('instrument').onchange=e=>edit(()=>track().instrument=+e.target.value);
 $('patch').onchange=e=>{const values=e.target.value.trim().split(/\s+/);if(values.length!==8||values.some(v=>!/^[0-9a-f]{2}$/i.test(v))){status('OPLL音色は2桁の16進数を8個、空白で区切ってください。',true);drawInspector();return;}edit(()=>song.opllPatch=values.map(v=>parseInt(v,16)));};
 for(const field of ['pitch','start','duration','velocity'])$('note-'+field).onchange=e=>{const n=track().notes.find(n=>n.id===selected),v=+e.target.value;if(!n)return;const candidate={...n,[field]:v};if(!Number.isInteger(v)||!fits(candidate,n.id)){status('値が範囲外か、他の音と重なります。',true);drawInspector();return;}edit(()=>Object.assign(n,candidate));};
 $('page').onchange=safe(e=>jumpToBar(+e.target.value));$('grid').onchange=e=>{grid=+e.target.value;drawRoll();};$('octave').onchange=e=>{topPitch=+e.target.value+11;drawRoll();drawStep();};
-for(const tab of ['roll','step'])$(tab+'-tab').onclick=()=>{view=tab;$('roll-view').hidden=tab!=='roll';$('step-view').hidden=tab!=='step';$('roll-tab').classList.toggle('active',tab==='roll');$('step-tab').classList.toggle('active',tab==='step');draw();};
+for(const tab of ['roll','step','mml'])$(tab+'-tab').onclick=()=>{if(view==='sound')releaseSoundKey();document.body.classList.remove('sound-mode');$('sound-tab').textContent='音色エディタ';$('sound-view').hidden=true;view=tab;for(const mode of ['roll','step','mml']){$(mode+'-view').hidden=mode!==tab;$(mode+'-tab').classList.toggle('active',mode===tab);}draw();};
 $('undo').onclick=()=>history('undo');$('redo').onclick=()=>history('redo');$('delete-note').onclick=deleteSelected;
 $('rest').onclick=()=>$('step-cursor').value=Math.min(end()-1,+$('step-cursor').value+ +$('length').value);
 $('step-delete').onclick=()=>{const n=track().notes.find(n=>n.start===+$('step-cursor').value);if(n){selected=n.id;deleteSelected();}};
@@ -350,8 +352,8 @@ $('validate').onclick=safe(async()=>{const d=await (await api('/api/validate',{s
 async function readMml(text){const result=await (await api('/api/mml',{text})).json();await replaceSong(result.song);$('import-dialog').close();status(result.warnings.length?result.warnings.join(' / '):'MMLを読み込みました。');}
 $('import-mml').onclick=safe(()=>readMml($('mml').value));
 $('file').onchange=safe(async e=>{const file=e.target.files[0];if(!file)return;if(file.size>4000000)throw new Error('ファイルが大きすぎます。');const bytes=await file.arrayBuffer();let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{text=new TextDecoder('shift-jis').decode(bytes);}if(file.name.toLowerCase().endsWith('.json')){await replaceSong(JSON.parse(text));$('import-dialog').close();status('JSONを読み込みました。');}else await readMml(text);e.target.value='';});
-window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,select')||document.querySelector('dialog[open]'))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();history(e.shiftKey?'redo':'undo');return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();history('redo');return;}if(e.code==='Space'){e.preventDefault();safe(play)();}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();}if(view==='step'&&!e.ctrlKey&&!e.metaKey){const i='zsxdcvgbhnjm'.indexOf(e.key.toLowerCase());if(i>=0&&e.key.length===1){e.preventDefault();stepNote(topPitch-23+i);}}});
-window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+window.addEventListener('keydown',e=>{if(view==='sound')return;if(e.target.matches('input,textarea,select')||document.querySelector('dialog[open]'))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();history(e.shiftKey?'redo':'undo');return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();history('redo');return;}if(e.code==='Space'){e.preventDefault();safe(play)();}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();}if(view==='step'&&!e.ctrlKey&&!e.metaKey){const i='zsxdcvgbhnjm'.indexOf(e.key.toLowerCase());if(i>=0&&e.key.length===1){e.preventDefault();stepNote(topPitch-23+i);}}});
+window.addEventListener('beforeunload',e=>{if(dirty||[...partMmlDrafts.values()].some(d=>d.dirty)){e.preventDefault();e.returnValue='';}});
 async function poll(){if(dirty||saving||drag||velocityDrag||waveDrawing||document.querySelector('dialog[open]')||document.activeElement.matches('input,textarea,select'))return;try{const data=await (await api('/api/state')).json();if(data.revision!==revision){stop();trackDrafts.clear();song=data.song;revision=data.revision;undo=[];redo=[];selected=null;draw();status('AI / 別画面の変更を反映しました · revision '+revision);}$('connection').textContent='● LOCAL';}catch{$('connection').textContent='● OFFLINE';}}
 safe(async()=>{const info=await (await api('/api/info')).json();token=info.token;opmTracks=info.opmTracks;info.patches.forEach((name,i)=>{$('instrument').add(new Option(String(i).padStart(2,'0')+' · '+name,i));$('note-instrument').add(new Option(String(i).padStart(2,'0')+' · '+name,i));});const data=await (await api('/api/state')).json();song=data.song;revision=data.revision;draw();status('ローカルで準備完了 · 自動保存 / MCP連携対応');setInterval(poll,2000);})();
 
@@ -359,10 +361,10 @@ safe(async()=>{const info=await (await api('/api/info')).json();token=info.token
 let auditionSerial=0,auditionAbort=null,auditionSource=null,auditionGain=null;
 const auditionCache=new Map();
 function stopAudition(){auditionSerial++;auditionAbort?.abort();auditionAbort=null;if(auditionSource){try{auditionGain?.gain.setTargetAtTime(0,audioContext.currentTime,.002);auditionSource.stop(audioContext.currentTime+.01);}catch{}auditionSource=null;auditionGain=null;}}
-async function auditionNote(note,candidate=null){
+async function auditionNote(note,candidate=null,independentTrack=null){
  if(!candidate&&!$('drag-audition').checked)return;
  stopAudition();const id=auditionSerial;
- const auditionSong=candidate||song,t=candidate?candidate.tracks[trackIndex]:track(),body={track:Object.fromEntries(['chip','channel','instrument','wave','psgMode','noisePeriod','decayMs','opmPatch'].filter(k=>k in t).map(k=>[k,t[k]])),note:{pitch:note.pitch,velocity:note.velocity},opllPatch:auditionSong.opllPatch,opllRhythm:!!auditionSong.opllRhythm};
+ const auditionSong=candidate||song,t=independentTrack||(candidate?candidate.tracks[trackIndex]:track()),body={track:Object.fromEntries(['chip','channel','instrument','wave','psgMode','noisePeriod','decayMs','opmPatch'].filter(k=>k in t).map(k=>[k,t[k]])),note:{pitch:note.pitch,velocity:note.velocity},opllPatch:auditionSong.opllPatch,opllRhythm:!!auditionSong.opllRhythm};
  for(const k of ['instrument','noisePeriod','decayMs'])if(k in note)body.note[k]=note[k];
  const key=JSON.stringify(body);
  try{
@@ -417,8 +419,8 @@ function drawOpm(){
  const p=track().opmPatch;$('opm-algorithm').value=p.algorithm;$('opm-feedback').value=p.feedback;
  const box=$('opm-operators'),expanded=[...box.querySelectorAll('details')].map(d=>d.open);box.replaceChildren();
  const fields={mul:['倍率 MUL',15],tl:['音量 TL',127],ar:['アタック AR',31],d1r:['減衰 D1R',31],d2r:['持続減衰 D2R',31],sl:['持続レベル SL',15],rr:['リリース RR',15],ks:['キースケール KS',3],dt1:['デチューン DT1',7],dt2:['デチューン DT2',3]};
- p.operators.forEach((op,i)=>{const group=document.createElement('details');group.open=!!expanded[i];const head=document.createElement('summary');head.textContent='Operator '+(i+1);group.append(head);
- for(const [k,[name,max]] of Object.entries(fields)){const label=document.createElement('label'),input=document.createElement('input');label.textContent=name;input.type='number';input.min=0;input.max=max;input.value=op[k];input.setAttribute('aria-label','OP'+(i+1)+' '+k);input.onchange=()=>{const v=Number(input.value);if(!Number.isInteger(v)||v<0||v>max){status(name+' の範囲は0〜'+max,true);input.value=op[k];return;}edit(()=>track().opmPatch.operators[i][k]=v);};label.append(input);group.append(label);}box.append(group);});
+ p.operators.forEach((op,i)=>{const group=document.createElement('details');group.open=expanded[i]??(view==='sound');const head=document.createElement('summary');head.textContent='Operator '+(i+1);group.append(head);const bank=document.createElement('div');bank.className='operator-bank';group.append(bank);
+ for(const [k,[name,max]] of Object.entries(fields)){const label=document.createElement('label'),input=document.createElement('input');label.textContent=name;input.type='number';input.min=0;input.max=max;input.value=op[k];input.setAttribute('aria-label','OP'+(i+1)+' '+k);input.onchange=()=>{const v=Number(input.value);if(!Number.isInteger(v)||v<0||v>max){status(name+' の範囲は0〜'+max,true);input.value=op[k];return;}edit(()=>track().opmPatch.operators[i][k]=v);};label.append(input);bank.append(label);}box.append(group);});
 }
 for(const k of ['algorithm','feedback'])$('opm-'+k).onchange=e=>{const v=Number(e.target.value);if(!Number.isInteger(v)||v<0||v>7){status('OPM設定は0〜7の整数です。',true);drawOpm();return;}edit(()=>track().opmPatch[k]=v);};
 
@@ -511,13 +513,14 @@ function startVelocityDrag(e,n,bar){
 const trackDrafts=new Map();let previewTail=Promise.resolve(),previewTimer=null;
 function previewOptions(){
  const t=track(),options=[{id:'',name:'現在の音色（変更なし）'}];
- if(isDrum())return options;
+ if(isDrum()&&t.chip==='OPLL')return options;
  if(t.chip==='OPM')for(const p of opmPresets)options.push({id:p.id,name:p.name,tone:{track:{opmPatch:p.patch}}});
  if(t.chip==='OPLL'){
   for(const o of $('instrument').options)options.push({id:'rom-'+o.value,name:o.textContent,tone:{track:{instrument:Number(o.value)}}});
   for(const p of opllPresets)options.push({id:p.id,name:p.name,tone:{track:{instrument:0},patch:p.patch}});
  }
  if(t.chip==='SCC')for(const p of sccPresets)options.push({id:p.id,name:p.name,tone:{track:{wave:p.wave}}});
+ for(const p of readToneLibrary().filter(p=>p.chip===t.chip))options.push({id:p.id,name:'自作 · '+p.name,tone:clone(p.tone)});
  return options;
 }
 function drawTrackPreview(){
@@ -552,6 +555,187 @@ $('preview-apply').onclick=safe(async()=>{
 
 $('preview-mute').onclick=()=>edit(()=>track().mute=!track().mute,true);
 $('preview-solo').onclick=()=>{solo=solo===trackIndex?null:trackIndex;if(livePlayer)livePlayer.setMix(song,solo);drawTracks();drawTrackPreview();};
+
+// BEGIN SYNTH EDITOR
+const opllFields=[['AM',0,7,1],['VIB',0,6,1],['EG',0,5,1],['KSR',0,4,1],['MUL',0,0,15],['KSL',2,6,3],['AR',4,4,15],['DR',4,0,15],['SL',6,4,15],['RR',6,0,15]];
+function opllFieldValue(p,byte,shift,mask){return (p[byte]>>shift)&mask;}
+function setOpllField(p,byte,shift,mask,value){const next=p.slice();next[byte]=(next[byte]&~(mask<<shift))|(value<<shift);return next;}
+function attachSynthKnob(range){
+ if(range.previousElementSibling?.classList.contains('synth-knob')){range.previousElementSibling.refreshKnob();return;}
+ const knob=document.createElement('div');knob.className='synth-knob';const face=document.createElement('span');face.className='synth-knob-face';knob.append(face);knob.tabIndex=0;knob.setAttribute('role','slider');knob.setAttribute('aria-label',(range.getAttribute('aria-label')||'音色')+' ノブ');knob.title='上下ドラッグで調整 · 矢印キーで1ずつ · Shiftで微調整';range.before(knob);range.classList.add('knob-source');range.tabIndex=-1;range.setAttribute('aria-hidden','true');
+ const paint=()=>{const lo=Number(range.min),hi=Number(range.max),v=Number(range.value);knob.style.setProperty('--angle',(-135+270*(v-lo)/(hi-lo))+'deg');knob.style.setProperty('--arc',(270*(v-lo)/(hi-lo))+'deg');knob.setAttribute('aria-valuemin',lo);knob.setAttribute('aria-valuemax',hi);knob.setAttribute('aria-valuenow',v);};
+ knob.refreshKnob=paint;const input=range.oninput;range.oninput=()=>{input?.();paint();};let drag=null;
+ const update=v=>{range.value=Math.max(Number(range.min),Math.min(Number(range.max),Math.round(v)));range.oninput();};
+ knob.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();knob.focus();knob.setPointerCapture(e.pointerId);drag={y:e.clientY,value:Number(range.value)};};
+ knob.onpointermove=e=>{if(drag)update(drag.value+(drag.y-e.clientY)*((Number(range.max)-Number(range.min))/(e.shiftKey?1600:180)));};
+ knob.onpointerup=()=>{if(!drag)return;const original=drag.value;drag=null;if(Number(range.value)!==original)range.onchange();};
+ knob.onpointercancel=()=>{if(drag){update(drag.value);drag=null;}};
+ knob.onkeydown=e=>{const v=Number(range.value),lo=Number(range.min),hi=Number(range.max);const step=e.shiftKey?10:1;const next={ArrowUp:v+step,ArrowRight:v+step,ArrowDown:v-step,ArrowLeft:v-step,Home:lo,End:hi,PageUp:v+5,PageDown:v-5}[e.key];if(next===undefined)return;e.preventDefault();update(next);if(v!==Number(range.value))range.onchange();};paint();
+}
+function synthControl(name,value,max,commit,min=0){
+ const label=document.createElement('label');label.className='synth-control';const caption=document.createElement('span');caption.textContent=name;
+ const number=document.createElement('input'),range=document.createElement('input');number.type='number';range.type='range';
+ for(const input of [number,range]){input.min=min;input.max=max;input.step=1;input.value=value;input.setAttribute('aria-label',name+(input===range?' スライダー':' 数値'));}
+ range.oninput=()=>number.value=range.value;number.oninput=()=>range.value=number.value;
+ const change=input=>{const v=Number(input.value);if(!Number.isInteger(v)||v<min||v>max){number.value=range.value=value;status(name+' の範囲: '+min+'〜'+max,true);return;}commit(v);};
+ range.onchange=()=>change(range);number.onchange=()=>change(number);label.append(caption,range,number);attachSynthKnob(range);return label;
+}
+function drawSoundEditor(){drawDesigner();}
+// JIS physical rows, bottom to top: 48 consecutive semitones.
+const soundKeyCodes=['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM','Comma','Period','Slash','IntlRo','KeyA','KeyS','KeyD','KeyF','KeyG','KeyH','KeyJ','KeyK','KeyL','Semicolon','Quote','Backslash','KeyQ','KeyW','KeyE','KeyR','KeyT','KeyY','KeyU','KeyI','KeyO','KeyP','BracketLeft','BracketRight','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0','Minus','Equal','IntlYen'];
+const soundKeyLabels=['Z','X','C','V','B','N','M',',','.','/','ろ','A','S','D','F','G','H','J','K','L',';',':',']','Q','W','E','R','T','Y','U','I','O','P','@','[','1','2','3','4','5','6','7','8','9','0','-','^','¥'];
+let heldSoundKey=null;
+function releaseSoundKey(){heldSoundKey=null;stopAudition();for(const key of $('sound-keyboard').children)key.classList.remove('held');}
+function drawSoundKeyboard(){
+ const box=$('sound-keyboard');box.replaceChildren();const pitches=designerChip==='PSG'&&designerDraft().track.psgMode==='drums'?[36,38,42,45,49]:Array.from({length:72},(_,i)=>24+i);
+ const drum=designerChip==='PSG'&&designerDraft().track.psgMode==='drums';box.classList.toggle('drum-keys',drum);const whites=pitches.filter(p=>![1,3,6,8,10].includes(p%12)).length;let whiteIndex=0;
+ for(const [index,pitch] of pitches.entries()){const key=document.createElement('button');key.type='button';key.dataset.pitch=pitch;key.textContent=(drum?drumNames[pitch]:noteName(pitch))+(soundKeyLabels[drum?index:index-(Number($('sound-octave').value)-1)*12]?' · '+soundKeyLabels[drum?index:index-(Number($('sound-octave').value)-1)*12]:'');key.className=[1,3,6,8,10].includes(pitch%12)?'black':'';if(!drum){const black=key.className==='black';key.style.left=((whiteIndex-(black?0.31:0))*36)+'px';key.style.width=((black?0.62:1)*36)+'px';if(!black)whiteIndex++;}key.onclick=safe(async()=>{const velocity=Number($('sound-velocity').value);if(!Number.isInteger(velocity)||velocity<1||velocity>15)throw Error('試奏音量は1〜15です。');const d=designerDraft();await auditionNote({pitch,velocity},{opllPatch:d.patch||[33,33,26,6,240,240,15,15],opllRhythm:false},clone(d.track));});box.append(key);}
+ box.scrollLeft=drum?0:(Number($('sound-octave').value)-1)*7*36;
+}
+$('sound-octave').onchange=()=>{releaseSoundKey();drawSoundKeyboard();};$('sound-silence').onclick=releaseSoundKey;
+window.addEventListener('keydown',e=>{
+ if(view!=='sound'||e.ctrlKey||e.metaKey||e.altKey||e.isComposing||e.target.matches('input,textarea,select,[contenteditable=true]')||document.querySelector('dialog[open]'))return;
+ const index=soundKeyCodes.indexOf(e.code);if(index<0)return;const box=$('sound-keyboard'),offset=box.classList.contains('drum-keys')?0:(Number($('sound-octave').value)-1)*12,key=box.children[index+offset];if(!key)return;
+ e.preventDefault();if(e.repeat)return;releaseSoundKey();heldSoundKey=e.code;key.classList.add('held');key.click();
+});
+window.addEventListener('keyup',e=>{if(e.code===heldSoundKey){e.preventDefault();releaseSoundKey();}});
+window.addEventListener('blur',()=>{if(heldSoundKey)releaseSoundKey();});
+
+const toneLibraryKey='msx-music-tone-library-v1';
+let designerChip='OPM';const designerDrafts=new Map(),designerHistories=new Map();
+function readToneLibrary(){try{const bank=JSON.parse(localStorage.getItem(toneLibraryKey)||'[]');return Array.isArray(bank)?bank.filter(p=>p&&['PSG','OPLL','SCC','OPM'].includes(p.chip)&&typeof p.id==='string'&&typeof p.name==='string'&&p.tone?.track):[];}catch{return [];}}
+function designerDraft(){
+ if(!designerDrafts.has(designerChip)){
+  const t={chip:designerChip,channel:0,instrument:0,wave:Array.from({length:32},(_,i)=>Math.round(100*Math.sin(i*Math.PI/16))),psgMode:'tone',noisePeriod:16,decayMs:0};
+  if(designerChip==='OPM')t.opmPatch=clone(opmTracks[0]?.opmPatch||{algorithm:4,feedback:2,operators:Array.from({length:4},()=>({mul:1,tl:24,ar:24,d1r:6,d2r:2,sl:4,rr:7,ks:1,dt1:0,dt2:0}))});
+  designerDrafts.set(designerChip,{track:t,patch:[33,33,26,6,240,240,15,15]});
+ }return designerDrafts.get(designerChip);
+}
+function designerHistory(){if(!designerHistories.has(designerChip))designerHistories.set(designerChip,{undo:[],redo:[]});return designerHistories.get(designerChip);}
+function designerEdit(fn){const h=designerHistory();h.undo.push(clone(designerDraft()));if(h.undo.length>80)h.undo.shift();h.redo=[];fn();drawDesigner();$('designer-status').textContent='音色を編集中 · 楽曲への変更なし';}
+function designerUndo(redo=false){const h=designerHistory(),from=redo?h.redo:h.undo,to=redo?h.undo:h.redo;if(!from.length)return;releaseSoundKey();to.push(clone(designerDraft()));designerDrafts.set(designerChip,from.pop());drawDesigner();}
+function designerPresets(){
+ let list=[];
+ if(designerChip==='OPM')list=opmPresets.map(p=>({id:p.id,name:p.name,tone:{track:{opmPatch:p.patch}}}));
+ if(designerChip==='OPLL')list=opllPresets.map(p=>({id:p.id,name:p.name,tone:{track:{instrument:0},patch:p.patch}}));
+ if(designerChip==='SCC')list=sccPresets.map(p=>({id:p.id,name:p.name,tone:{track:{wave:p.wave}}}));
+ if(designerChip==='PSG')list=[['tone','矩形波'],['noise','減衰ノイズ'],['drums','ドラムキット']].map(([mode,name])=>({id:mode,name,tone:{track:{psgMode:mode,noisePeriod:16,decayMs:120}}}));
+ return list.concat(readToneLibrary().filter(p=>p.chip===designerChip).map(p=>({...p,name:'自作 · '+p.name})));
+}
+function drawDesigner(){
+ const d=designerDraft(),t=d.track,box=$('designer-controls'),selectedPreset=$('designer-preset').value;box.replaceChildren();$('synth-extra').replaceChildren();
+ $('designer-preset').replaceChildren(new Option('音色を選択…',''),...designerPresets().map(p=>new Option(p.name,p.id)));$('designer-preset').value=selectedPreset;
+ for(const button of $('designer-chips').children)button.classList.toggle('active',button.dataset.chip===designerChip);
+ $('designer-undo').disabled=!designerHistory().undo.length;$('designer-redo').disabled=!designerHistory().redo.length;
+ $('designer-update').disabled=!readToneLibrary().some(p=>p.chip===designerChip&&p.id===selectedPreset);
+ const card=(title)=>{const section=document.createElement('section');section.className='designer-card';const head=document.createElement('h4');head.textContent=title;section.append(head);box.append(section);return section;};
+ const control=(parent,name,value,max,set,min=0)=>{const item=synthControl(name,value,max,v=>designerEdit(()=>set(v)),min);if(['ATTACK','DECAY 1','DECAY 2','SUSTAIN','RELEASE','AR','DR','SL','RR'].includes(name))item.classList.add('envelope-value');parent.append(item);};
+ box.dataset.chip=designerChip;
+ if(designerChip==='OPM'){
+  const p=t.opmPatch,global=card('ROUTING / GLOBAL');control(global,'ALGORITHM',p.algorithm,7,v=>p.algorithm=v);control(global,'FEEDBACK',p.feedback,7,v=>p.feedback=v);
+  const fields={mul:['MUL',15],tl:['LEVEL / TL',127],ar:['ATTACK',31],d1r:['DECAY 1',31],d2r:['DECAY 2',31],sl:['SUSTAIN',15],rr:['RELEASE',15],ks:['KEY SCALE',3],dt1:['DETUNE 1',7],dt2:['DETUNE 2',3]};
+  p.operators.forEach((op,i)=>{const bank=card('OPERATOR '+(i+1));bank.classList.add('fm-operator');for(const [key,[name,max]] of Object.entries(fields))control(bank,name,op[key],max,v=>op[key]=v);});
+ }else if(designerChip==='OPLL'){
+  for(let op=0;op<2;op++){const bank=card(op?'CARRIER / OUTPUT':'MODULATOR / COLOR');bank.classList.add('fm-operator');const fields=opllFields.map(([name,byte,shift,mask])=>[name,byte+op,shift,mask]);fields.push(['WAVE',3,op?4:3,1]);if(!op)fields.push(['TL',2,0,63],['FEEDBACK',3,0,7]);for(const [name,byte,shift,mask] of fields)control(bank,name,opllFieldValue(d.patch,byte,shift,mask),mask,v=>d.patch=setOpllField(d.patch,byte,shift,mask,v));}
+ }else if(designerChip==='SCC'){
+  const bank=card('SCC / WAVEFORM');bank.classList.add('designer-wave-bank');const hint=document.createElement('p');hint.className='designer-wave-hint';hint.textContent='32 SAMPLES · −128〜127 · ドラッグで波形を描画';const readout=document.createElement('output');readout.className='designer-wave-readout';readout.textContent='POINT — / VALUE —';bank.append(hint,readout);const canvas=document.createElement('canvas');canvas.id='designer-wave';canvas.width=1024;canvas.height=240;canvas.setAttribute('aria-label','SCC音色波形。ドラッグで変形');bank.append(canvas);
+  const paint=()=>{const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height;c.clearRect(0,0,w,h);c.strokeStyle='#344e60';c.lineWidth=1;c.beginPath();for(let i=0;i<=32;i++){c.moveTo(i*w/32,0);c.lineTo(i*w/32,h);}c.moveTo(0,h/2);c.lineTo(w,h/2);c.stroke();c.strokeStyle='#9bd8ee';c.lineWidth=3;c.beginPath();t.wave.forEach((v,i)=>{const x=(i+.5)*w/32,y=8+(127-v)/255*(h-16);i?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();};
+  let before=null,last=null;const point=e=>{const r=canvas.getBoundingClientRect(),index=Math.max(0,Math.min(31,Math.floor((e.clientX-r.left)/r.width*32))),value=Math.max(-128,Math.min(127,Math.round(127-((e.clientY-r.top)/r.height*240-8)/224*255)));reshapeWave(t.wave,last,index,value);last={index,value};readout.textContent='POINT '+String(index+1).padStart(2,'0')+' / VALUE '+value;paint();};
+  canvas.onpointerdown=e=>{if(e.button!==0)return;before=t.wave.slice();last=null;canvas.setPointerCapture(e.pointerId);point(e);};canvas.onpointermove=e=>{if(before)point(e);};canvas.onpointerup=()=>{if(!before)return;const result=t.wave.slice();t.wave=before;before=null;designerEdit(()=>t.wave=result);};canvas.onpointercancel=()=>{if(before){t.wave=before;before=null;paint();}};paint();
+ }else{
+  const bank=card('PSG / TONE & NOISE');const mode=document.createElement('select');mode.setAttribute('aria-label','音色PSGモード');for(const [v,name] of [['tone','矩形波'],['noise','ノイズ'],['drums','ドラムキット']])mode.add(new Option(name,v));mode.value=t.psgMode;mode.onchange=()=>designerEdit(()=>t.psgMode=mode.value);bank.append(mode);control(bank,'NOISE PERIOD',t.noisePeriod,31,v=>t.noisePeriod=v,1);control(bank,'DECAY / ms',t.decayMs,2000,v=>t.decayMs=v);
+ }
+ drawSoundKeyboard();
+}
+$('sound-tab').onclick=()=>{if(view==='sound'){$('roll-tab').onclick();return;}$('sound-tab').textContent='譜面に戻る';stop();view='sound';document.body.classList.add('sound-mode');for(const mode of ['roll','step','mml'])$(mode+'-view').hidden=true;$('sound-view').hidden=false;drawDesigner();};
+$('designer-back').onclick=releaseSoundKey;
+for(const button of $('designer-chips').children)button.onclick=()=>{releaseSoundKey();designerChip=button.dataset.chip;$('designer-preset').value='';$('designer-name').value='';$('designer-status').textContent='';drawDesigner();};
+$('designer-preset').onchange=()=>{$('designer-update').disabled=!readToneLibrary().some(p=>p.chip===designerChip&&p.id===$('designer-preset').value);};
+$('designer-load').onclick=()=>{const p=designerPresets().find(p=>p.id===$('designer-preset').value);if(!p)return;releaseSoundKey();designerEdit(()=>{Object.assign(designerDraft().track,clone(p.tone.track));if(p.tone.patch)designerDraft().patch=clone(p.tone.patch);});$('designer-name').value=p.name.replace(/^自作 · /,'');};
+function saveDesigner(update=false){const name=$('designer-name').value.trim();if(!name){$('designer-status').textContent='音色名を入力してください。';return;}const bank=readToneLibrary(),d=designerDraft(),id=update?$('designer-preset').value:'tone-'+crypto.randomUUID(),old=bank.find(p=>p.id===id&&p.chip===designerChip);if(update&&!old)return;const keys={PSG:['psgMode','noisePeriod','decayMs'],OPLL:['instrument'],SCC:['wave'],OPM:['opmPatch']}[designerChip],tone={track:Object.fromEntries(keys.map(k=>[k,clone(d.track[k])]))};if(designerChip==='OPLL')tone.patch=clone(d.patch);const entry={id,chip:designerChip,name,tone};if(old)bank[bank.indexOf(old)]=entry;else bank.push(entry);try{localStorage.setItem(toneLibraryKey,JSON.stringify(bank));}catch{$('designer-status').textContent='保存できませんでした。ブラウザーの保存容量を確認してください。';return;}drawDesigner();$('designer-preset').value=id;$('designer-update').disabled=false;$('designer-status').textContent='保存しました · 譜面側の音色一覧で「自作 · '+name+'」を選べます。';}
+$('designer-save').onclick=()=>saveDesigner();$('designer-update').onclick=()=>saveDesigner(true);$('designer-undo').onclick=()=>designerUndo();$('designer-redo').onclick=()=>designerUndo(true);
+window.addEventListener('keydown',e=>{if(view!=='sound'||e.target.matches('input,textarea,select'))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();designerUndo(e.shiftKey);}});
+// END SYNTH EDITOR
+
+// BEGIN PART MML CODEC
+// This local editor dialect keeps MGSC % lengths (48 PPQ); ! adds exact 96-PPQ ticks.
+function encodePartMml(notes){
+ const length=n=>[1,2,4,8,16,32,64].find(x=>384/x===n)?.toString()||'!'+n;
+ const ordered=[...notes].sort((a,b)=>a.start-b.start),counts=new Map();
+ for(const n of ordered)counts.set(n.duration,(counts.get(n.duration)||0)+1);
+ const base=[...counts].sort((a,b)=>b[1]-a[1])[0]?.[0]||96;
+ let cursor=0,bar=-1,velocity=null,octave=null,line='';const lines=['; パート全体 / 4分音符=96 tick','q8 l'+length(base)];
+ const flush=()=>{if(line){lines.push(line);line='';}};
+ const append=token=>{if(line&&line.length+token.length+1>120)flush();line+=(line?' ':'')+token;};
+ const suffix=n=>n===base?'':length(n);
+ for(const n of ordered){
+  if(n.start>cursor)append('r'+suffix(n.start-cursor));
+  const b=Math.floor(n.start/384);if(b!==bar){flush();lines.push('; 小節 '+(b+1));bar=b;}
+  const settings=[],nextOctave=Math.floor(n.pitch/12)-1;
+  if(n.velocity!==velocity){settings.push('v'+n.velocity);velocity=n.velocity;}
+  if(octave===null)settings.push('o'+nextOctave);
+  else if(nextOctave!==octave)settings.push((nextOctave>octave?'>':'<').repeat(Math.abs(nextOctave-octave)));
+  octave=nextOctave;
+  const extra=Object.fromEntries(Object.entries(n).filter(([k])=>!['id','pitch','start','duration','velocity'].includes(k)));
+  settings.push(['c','c+','d','d+','e','f','f+','g','g+','a','a+','b'][n.pitch%12]+suffix(n.duration));
+  append(settings.join(' ')+(Object.keys(extra).length?' '+JSON.stringify(extra):''));cursor=n.start+n.duration;
+ }
+ flush();return lines.join('\n');
+}
+function parsePartMml(text,limit){
+ if(typeof text!=='string'||text.length>500000)throw new Error('MMLは500,000文字以内にしてください。');
+ let i=0,oct=4,base=96,velocity=12,gate=8,cursor=0,steps=0;const notes=[];
+ function fail(message,pos=i){const before=text.slice(0,pos),line=before.split('\n').length,col=pos-before.lastIndexOf('\n');throw new Error(`${line}行 ${col}列: ${message}`);}
+ function skip(){while(i<text.length){if(/\s/.test(text[i])){i++;continue;}if(text[i]===';'){while(i<text.length&&text[i]!=='\n')i++;continue;}break;}}
+ function number(){const m=/^\d+/.exec(text.slice(i));if(!m)fail('数値が必要です。');i+=m[0].length;const v=Number(m[0]);if(!Number.isSafeInteger(v))fail('数値が大きすぎます。');return v;}
+ function len(){let value=base;if(text[i]==='%'||text[i]==='!'){const unit=text[i++];value=number()*(unit==='%'?2:1);}else if(/\d/.test(text[i]||'')){const d=number();if(!d)fail('音長0は使用できません。');value=384/d;}let add=value;while(text[i]==='.'){i++;add/=2;value+=add;}if(value<=0||!Number.isFinite(value))fail('音長が不正です。');return value;}
+ function sequence(depth=0){if(depth>8)fail('ループは8重までです。');while(true){skip();if(i>=text.length)return;if(text[i]===']'){if(!depth)fail('対応する [ がありません。');return;}if(++steps>100000)fail('展開後のMMLが大きすぎます。');const pos=i,ch=text[i++].toLowerCase();
+  if(ch==='['){const begin=i;sequence(depth+1);if(text[i]!==']')fail('] がありません。',pos);i++;const close=i;const count=/\d/.test(text[i]||'')?number():2;const after=i;if(count<1||count>32)fail('繰り返しは1～32回です。',pos);for(let n=1;n<count;n++){i=begin;sequence(depth+1);if(i!==close-1)fail('ループ構文が不正です。');}i=after;continue;}
+  if('cdefgabr'.includes(ch)){
+   let pitch=12*(oct+1)+({c:0,d:2,e:4,f:5,g:7,a:9,b:11,r:0}[ch]);if(ch!=='r'&&['+','#','-'].includes(text[i]))pitch+=text[i++]==='-'?-1:1;
+   let duration=len();while(text[i]==='^'){i++;duration+=len();}const sounding=duration*gate/8;if(!Number.isInteger(duration)||!Number.isInteger(sounding)||sounding<1)fail('96 PPQで表現できる音長・ゲートにしてください。',pos);
+   skip();let extra={};if(text[i]==='{'){const start=i,end=text.indexOf('}',i);if(end<0)fail('個別設定の } がありません。');i=end+1;try{extra=JSON.parse(text.slice(start,i));}catch{fail('個別設定のJSONが不正です。',start);}for(const [key,value] of Object.entries(extra)){if(!['instrument','detuneCents','vibratoDepth','vibratoRate','vibratoDelayMs','portamentoMs','portamentoFrom','noisePeriod','decayMs'].includes(key)||!Number.isInteger(value))fail('未対応の個別設定: '+key,start);}if(ch==='r'||velocity===0)fail('休符には個別設定を指定できません。',start);}
+   if(ch!=='r'&&velocity>0){if(pitch<24||pitch>95)fail('音程はC1～B6です。',pos);notes.push({...extra,id:'mml-'+notes.length,pitch,start:cursor,duration:sounding,velocity});if(notes.length>16000)fail('最大16000音です。');}
+   cursor+=duration;if(cursor>limit)fail('曲の終端を超えています。小節数を増やすか音符を短くしてください。',pos);
+  }else if(ch==='o'){oct=number();if(oct<1||oct>6)fail('o1～o6を指定してください。',pos);}
+  else if(ch==='>'||ch==='<'){oct+=ch==='>'?1:-1;if(oct<1||oct>6)fail('音域を超えています。',pos);}
+  else if(ch==='l')base=len();
+  else if(ch==='v'){velocity=number();if(velocity>15)fail('v0～v15を指定してください。',pos);}
+  else if(ch==='q'){gate=number();if(gate<1||gate>8)fail('q1～q8を指定してください。',pos);}
+  else fail('未対応のコマンド: '+ch,pos);
+ }}sequence();return notes;
+}
+// END PART MML CODEC
+const partMmlDrafts=new Map();let partMmlTimer=null,partMmlRequest=0;
+function partMmlBase(){return JSON.stringify({title:song.title,bars:song.bars,opllRhythm:song.opllRhythm,track:track()});}
+function partMmlMessage(text,error=false){$('part-mml-status').textContent=text;$('part-mml-status').classList.toggle('error',error);}
+function drawPartMml(){
+ const id=track().id,base=partMmlBase();let d=partMmlDrafts.get(id);
+ if(!d||(!d.dirty&&d.base!==base)){d={base,text:encodePartMml(track().notes),dirty:false};partMmlDrafts.set(id,d);}
+ $('part-mml-title').textContent=track().name+' · '+track().chip;
+ if($('part-mml').value!==d.text)$('part-mml').value=d.text;
+ $('part-mml-apply').disabled=true;
+ if(d.base!==base){partMmlMessage('元のパートが変更されています。下書きを退避し、「現在のパートから再取得」してください。',true);return;}
+ partMmlMessage(d.dirty?'未反映の下書き':'現在のパートを表示中');
+ if(d.dirty)schedulePartMmlCheck();
+}
+function schedulePartMmlCheck(){clearTimeout(partMmlTimer);partMmlTimer=setTimeout(()=>checkPartMml(false),350);}
+async function checkPartMml(apply=false){
+ clearTimeout(partMmlTimer);const request=++partMmlRequest,id=track().id,d=partMmlDrafts.get(id),text=d?.text,base=partMmlBase(),sentEpoch=epoch;
+ $('part-mml-apply').disabled=true;if(!d)return;
+ try{
+  if(d.base!==base)throw new Error('元のパートが変更されています。再取得が必要です。');
+  const notes=parsePartMml(text,end()),candidate=clone(song);candidate.tracks[trackIndex].notes=notes;
+  await api('/api/validate',{song:candidate});
+  if(request!==partMmlRequest||id!==track().id||text!==d.text||base!==partMmlBase()||epoch!==sentEpoch)return;
+  if(apply){if(!d.dirty)return;edit(()=>{track().notes=notes;selected=null;editRange=null;d.dirty=false;});partMmlMessage(`${notes.length}音を反映しました。Undoで戻せます。`);}
+  else{partMmlMessage(`構文・楽曲検証OK · ${notes.length}音`+(d.dirty?' · 未反映':''));$('part-mml-apply').disabled=!d.dirty;}
+ }catch(e){if(request===partMmlRequest&&id===track().id&&text===d.text)partMmlMessage(e.message,true);}
+}
+$('part-mml').addEventListener('input',()=>{const d=partMmlDrafts.get(track().id);if(!d)return;d.text=$('part-mml').value;d.dirty=true;partMmlRequest++;$('part-mml-apply').disabled=true;partMmlMessage('未反映 · 検証中…');schedulePartMmlCheck();});
+$('part-mml-check').onclick=()=>checkPartMml(false);
+$('part-mml-apply').onclick=()=>checkPartMml(true);
+$('part-mml-reload').onclick=()=>{const d=partMmlDrafts.get(track().id);if(d?.dirty&&!confirm('このパートの未反映MMLを破棄し、現在の音符から再取得しますか？'))return;partMmlRequest++;partMmlDrafts.delete(track().id);drawPartMml();};
 
 function syncPitchScroll(){const box=$('roll-pitch-scroll'),target=(95-topPitch)*16;if(Math.abs(box.scrollTop-target)>1)box.scrollTop=target;}
 $('roll-pitch-scroll').addEventListener('scroll',()=>{
