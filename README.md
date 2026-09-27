@@ -1,10 +1,18 @@
-# MSX Music Alchemy v0.8.0 — Human UI Update 1
+# MSX Music Alchemy v0.9.0 — Human UI Update 2
 
-v0.8.0 adds track/range copy, bulk timing and volume edits, echo setup, and chip-voice audition while dragging notes. It retains real-time local chip playback. Mute and solo can be switched without stopping the music. Note and instrument edits still stop playback; file exports retain their existing rendering path.
+Kanonの実際の編集操作をもとに、**パートごとの音色・音量・オクターブを試して決める操作**を中心に改善しました。
 
-Human UI Update 1 は、Kanonが実際に編集して気づいた使い勝手を改善する最初の更新です。今後もKanonの実使用で得たフィードバックを中心に、人間が編集しやすいUIを改善していきます。
+- **選択トラックの試聴調整パネル**：音色選択・前後の候補・単音試聴・音量倍率・オクターブ・Mute/Soloを一か所に集約。
+- **仮調整と反映の分離**：再生中に比較でき、「データに反映」までは保存・書き出しを変更しません。リセットとUndoに対応。
+- **VelocityのGUI編集**：広いレーンの棒を上下ドラッグしてノート単位の強弱を調整。
+- **パートを見つけやすいピアノロール**：パート色、所属パートの強調、音符クリックで編集対象へ移動。横スクロールで小節、縦スクロールで音域を移動。
+- **音色選びの拡充**：任意のSFG / YM2151（OPM）8ch、OPM 129種・OPLLカスタム61種・SCC波形16種＋基本4波形。追加FM音色には試作バリエーションを含みます。
+- **その他**：自作OPM音色のブラウザー内保存、小節ジャンプ、再生接続の安定性改善。
 
-**Turn ideas into chip music.** A local-first PSG / OPLL / SCC music editor with a piano roll,
+音量は各ノートのVelocity倍率（1–15に丸め）です。再生中の仮調整には音声先読み分の遅延があります。OPLL CustomとSCC 4/5chは音色を共有します。OPM使用時はMGSDRV出力不可です。
+音符編集や音色パラメーターの直接編集などでは、再生が停止する場合があります。
+
+**Turn ideas into chip music.** A local-first PSG / OPLL / SCC / optional OPM music editor with a piano roll,
 step entry, game-ready data exports, and an MCP server for AI-assisted composition.
 
 ![MSX Music Alchemy interface](docs/images/interface.gif)
@@ -40,8 +48,8 @@ Python不要のWindows版はReleasesのZIPを展開し、`MSXMusicAlchemy.exe` �
 
 ゲーム開発パックZIP: 編集JSON、schema、レジスタJSON、Cヘッダー、バイナリ、
 VGM、C89スケジューラー、AI向け説明、組み込みガイド。WAVも個別出力できます。
-「MGSDRV (.mgs)」で、PSG 3＋SCC 5＋FM 9パートを実機プレイヤー向けに出力できます。
-60 Hz・最大16 KiB（バイナリ部分）。カスタムFM音色、SCC波形、ループに対応します。
+「MGSDRV (.mgs)」で、PSG 3＋SCC 5＋FM 9、またはFM 6＋リズムを実機プレイヤー向けに出力できます。
+60 Hz・最大16 KiB（ファイル全体）。カスタムFM音色、SCC波形、ループに対応します。
 使用方法と検証範囲は [MGSDRV出力](docs/MGSDRV_EXPORT.md)。
 muteは出力に反映します。soloは試聴だけに適用し、出力には反映しません。
 MCPは [MCP_SETUP.md](MCP_SETUP.md)、ゲームへの導入は [GAME_INTEGRATION.md](docs/GAME_INTEGRATION.md)。
@@ -67,7 +75,7 @@ UTF-8 / Shift-JISの.mus / .mml入力、貼り付けに対応。未対応構文�
 ## 現時点の範囲
 
 PSGは矩形波、ノイズ減衰、ドラムキットに対応。トラック／音符ごとの減衰時間を指定できます。ハードウェアエンベロープは未対応です。
-OPLLは9音メロディ、または6音メロディ＋リズム（実験対応）。リズム時はOPLL 7〜9をドラムに使用します。リズム曲のMGS出力は未対応です。音色はトラック内で固定。
+OPLLは9音メロディ、または6音メロディ＋リズム（実験対応）。リズム時はOPLL 7〜9をドラムに使用します。MGS出力もリズム・ノート別音色・ビブラート・ポルタメントに対応します（MGSDRV向け近似変換）。
 SCCは標準SCC（4/5ch波形共有）。SCC+専用モードは未対応。
 テンポ・拍子は曲内固定。MMLの高度なマクロ、LFOなどは未対応。
 汎用MMLからのMGSコンパイル、MIDI機器入力、実チップ出力、ROM自動生成は含みません。
@@ -121,3 +129,7 @@ OPLLの再生エンジンをymfmへ変更し、旧エンジンで発音時に聞
 ## v0.7.0 リアルタイム試聴
 
 曲全体を事前に音声化せず、PSG・OPLL・SCCの音源エンジンを動かしながら試聴します。M（ミュート）とS（ソロ）は演奏を止めずに切り替えできます。音符・音色・テンポなどの編集は停止して次回再生へ反映します。WAV・VGM等の書き出しは従来の処理です。
+
+### v0.9.0 — Optional SFG / OPM
+
+チャンネル欄の「SFG / OPMを使用」で8チャンネルを追加できます。4オペレーター音色編集、リアルタイム再生、MCP、WAV/VGM出力に対応。OPM有効時のMGSDRV出力は不可です。既存17チャンネル曲は従来どおり使えます。SFG実機での再生は未検証です。

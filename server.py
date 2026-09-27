@@ -10,6 +10,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 import core
+import opm
 from realtime import LivePool
 from mgs import export_mgs
 from mml import import_mml
@@ -46,10 +47,10 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed(): return self.reply(dict(error='Local access only'),403)
         route=urlparse(self.path).path
         if route=='/api/state': return self.reply(self.server.store.get())
-        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.8.1',token=self.server.token,patches=core.PATCH_NAMES))
+        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.9.0',token=self.server.token,patches=core.PATCH_NAMES,opmTracks=opm.tracks()))
         if route=='/api/new': return self.reply(core.new_song())
         if route=='/api/demo': return self.reply(core.demo_song())
-        allowed={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/live-player.js':'live-player.js','/live-worklet.js':'live-worklet.js','/live-worker.js':'live-worker.js','/track-edit.js':'track-edit.js'}
+        allowed={'/opm-presets.json':'opm-presets.json','/':'index.html','/app.js':'app.js','/style.css':'style.css','/live-player.js':'live-player.js','/live-worklet.js':'live-worklet.js','/live-worker.js':'live-worker.js','/track-edit.js':'track-edit.js','/track-preview.js':'track-preview.js'}
         if route not in allowed: return self.reply(dict(error='Not found'),404)
         path=core.ROOT/'static'/allowed[route]
         self.reply(path.read_bytes(),kind=mimetypes.guess_type(str(path))[0]+'; charset=utf-8')
@@ -67,6 +68,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not hasattr(self.server,'live'): self.server.live=LivePool()
                 if route=='/api/live/start': return self.reply(self.server.live.start(body['song'],body.get('startTick',0)))
                 if route=='/api/live/pull': return self.reply(self.server.live.pull(body['session'],body['masks'],body.get('requestId')),kind='application/octet-stream')
+                if route=='/api/live/tone': return self.reply(self.server.live.update_tones(body['session'],body['song']))
                 if route=='/api/live/stop':
                     self.server.live.stop(body['session']); return self.reply(dict(stopped=True))
             if route=='/api/state': return self.reply(self.server.store.put(body['song'],body['revision']))

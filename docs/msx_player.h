@@ -21,6 +21,9 @@ static void msx_song_stop(void) {
     for(i=0;i<3;i++) msx_write(0,8+i,0);
     for(i=0;i<9;i++) msx_write(1,0x20+i,0);
     msx_write(2,0x8f,0);
+#if MSX_SONG_OPM
+    for(i=0;i<8;i++) msx_write(3,8,i);
+#endif
 }
 static void msx_song_start(void) {
     msx_pos=0; msx_running=1; msx_wait=msx_read16();

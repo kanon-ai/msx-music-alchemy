@@ -99,7 +99,7 @@ AI向け説明と仕様が一緒になります。ゲーム開発AIにZIPの中�
 音源・マッパー・SFXチャンネルの条件を渡してください。
 
 WAVは確認用の1回再生＋余韻です。VGMは外部プレイヤー用です。
-MGSDRV (.mgs)は60 Hz・全17パート対応。FM音色・SCC波形・ループ・ミュートを反映します。
+MGSDRV (.mgs)は60 Hz・全17旋律パート、またはFM6＋リズム・PSG3・SCC5に対応。FM音色・SCC波形・ノート別音色・ループ・ミュートを反映します。ビブラート／ポルタメントはMGSDRVの奏法に近似し、タイミングは安全な音長に量子化、ドラムはドライバ側の自然減衰を使います。
 16 KiBを超える曲や50 Hzの曲は、切り捨てずエラーで停止します。
 実機での再生方法と制限は [MGSDRV_EXPORT.md](MGSDRV_EXPORT.md) を参照してください。
 C/BINはゲームに自動で組み込まれるものではありません。
@@ -165,3 +165,43 @@ OPLL旋律の音符を選ぶと、その音だけの音色、デチューン（c
 コピー先の音符は上書きしません。重なり・曲の範囲外・音源固有の制約がある場合は適用せず通知します。終端に余裕がない場合は先に曲の小節数を増やしてください。「音色設定もコピー」は空トラックのみ。SCC 4 / 5の共有波形が変わるコピーは拒否し、もう一方の音色を勝手に変えません。各適用はCtrl+Zで取り消せます。
 
 「ドラッグ試聴」を有効にすると、音符をつかんだときと音程が変わったときに、そのトラックの音色で短く試聴できます。同じ音程での横移動と音長変更では繰り返し発音しません。ミュートされたトラックでも選択した音を試聴できます。試聴は保存されず、音程確認のためビブラート・ポルタメントを付けずに鳴らします。高速な移動中は古い未完了の試聴を破棄し、最新の音程を優先します。
+
+## Optional SFG / OPM
+
+Enable `SFG / OPMを使用` in the channel panel to add eight independent YM2151 voices (25 tracks total). Disabled by default; existing 17-track projects retain their sound. To disable, first save and clear the OPM notes; disabling never silently deletes a part. MGSDRV export is rejected whenever this option is enabled, even if OPM tracks are empty or muted.
+
+Each OPM track has its own four-operator `opmPatch`: algorithm and feedback 0–7, plus operators in algorithm order (register offsets 0, 16, 8, 24). Parameters: DT1 0–7, MUL 0–15, TL 0–127, KS 0–3, AR/D1R/D2R 0–31, DT2 0–3, SL/RR 0–15. Higher TL means quieter. Velocity adds attenuation only to the algorithm's carriers. No other OPM channel shares this patch.
+
+Delayed software vibrato, detune and portamento use the same note fields as melodic OPLL. Live mute/solo, drag audition, track copying, WAV, VGM and register exports support OPM. Preview/WAV remain mono; pan, hardware LFO, OPM noise and SFG MIDI functions are not exposed. Emulation uses YM2151 at 3,579,545 Hz; distinct YM2164 behavior and physical SFG playback are unverified.
+
+MCP: get_song → configure_opm(song, enabled=true) → get_opm_patch_template → edit OPM notes and opmPatch → validate_song → set_song with current revision. configure_opm returns a copy and does not save. JSON can also be edited directly.
+
+### OPM公開プリセット
+
+OPMトラックの「OPMプリセット」で音色を選び、「選択音色を適用」を押します。選択トラックの音色だけを変更し、音符・他トラックは保持します。Undoで戻せます。Commander X16のBSD-2-Clause音色から鍵盤・ベル／打楽器・オルガン・ギター・ベース・弦・合奏／コーラス・金管・リード楽器・笛・シンセリード・パッドの12分類、計96音色を収録。元音色のハードウェアLFOは未適用です（該当音色は選択時に注記）。必要に応じて音符のビブラートを設定してください。音色の出典・ライセンスは `licenses/x16-opm/` に同梱しています。
+
+### OPLLカスタムプリセット
+
+OPLL旋律トラックで45種のプリセット（YM2413 / VRC7 / YMF281B各15種）を選び、「共有カスタム音色へ適用」を押します。選択トラックはCustomになります。全OPLLのCustom使用トラック・音符が共有音色の変更を受けます。音符ごとの音色指定は保持します。Undo可能です。リズムトラックには適用できません。VRC7 / YMF281B音色はYM2413での近似再生です。既存の内蔵音色選択は引き続き利用できます。
+
+
+## Human UI Update 2
+
+- 「SFG / OPMを使用」で8ch追加。OPM入りの曲はMGS書き出し不可です。
+- パートの色は右側で指定し、楽曲JSONに保存します。音符に触れると左の所属パートを強調、クリックでそのパートへ移動します。
+- ピアノロール下の横スクロールバーは表示小節を移動します。
+- 音色の候補選択は単音試聴のみ。「適用」で楽曲へ反映します。再生中のプリセット適用・Undoは再生位置を維持します。
+- 試聴オクターブは±2、音程24〜95の範囲。保存・書き出しの音符には反映しません。
+- OPLLのCustomは全Customパートで共有。SCCの4/5chも波形を共有します。
+- OPM音色追加保存はブラウザー内です。使用中のパッチは楽曲JSONにも保存されます。
+- 全パート名・音色ライブラリは参考用。試作音色は用途・音域に応じて調整してください。
+
+## 選択トラックの仮調整とVelocity編集
+
+ピアノロール下の「選択トラック・試聴調整」で音色・音量倍率・オクターブを試せます。各パートの仮調整は選択を変えても保持され、再生中にも反映します。再読み込みでは破棄されます。JSON保存・書き出しには含めず、「データに反映」で選択パートを確定します。Undoで戻せます。
+
+音量は既存ノートのVelocityに対する1–200%の倍率で、結果を1–15に丸めます。音域を超えるオクターブ移動は拒否します。OPLL共有CustomおよびSCC 4/5ch共有波形は、他の該当パートにも影響します。同じ共有音色の仮調整は1パートずつ反映してください。複数PSGノイズ使用時の再生中調整は非対応です。
+
+Velocity欄の棒を上下にドラッグすると個別ノートの強弱を1–15で変更します。矢印上下キーでも編集できます。この操作は仮調整ではなく直接編集で、再生を停止します。1回のドラッグを1回のUndoで戻せます。
+
+ピアノロールの横スクロールで小節、右端の縦スクロールで音域を移動します。表示小節・音域のプルダウンは画面から外しました。下部試聴パネルの説明は折りたたんで表示できます。

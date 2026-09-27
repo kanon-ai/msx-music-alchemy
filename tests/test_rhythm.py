@@ -23,7 +23,7 @@ class RhythmTests(unittest.TestCase):
   with self.assertRaises(ValueError):core.validate(s)
  def test_type_and_mgs(self):
   s=self.song()
-  with self.assertRaisesRegex(ValueError,'MGS'):mgs.export_mgs(s)
+  blob=mgs.export_mgs(s);self.assertEqual(blob[blob.index(b'\x1a')+2],1)
   s['opllRhythm']=1
   with self.assertRaises(ValueError):core.validate(s)
  def test_muted_and_solo_audio(self):

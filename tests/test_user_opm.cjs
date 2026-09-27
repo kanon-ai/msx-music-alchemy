@@ -1,0 +1,5 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const src=fs.readFileSync('static/app.js','utf8').split('// User tones stay local;')[1].split('let toneApplyBusy=')[0];
+const nodes={'opm-user-name':{value:'Soft Grand'},'opm-user-save':{},'opm-preset':{append(g){nodes[g.id]=g;}}};let stored=null;
+const patch={algorithm:4};const ctx={$:id=>nodes[id],opmPresets:[],document:{createElement:()=>({append(){}})},Option:function(){},localStorage:{getItem:()=>stored,setItem:(k,v)=>stored=v},crypto:{randomUUID:()=> 'test'},track:()=>({chip:'OPM',opmPatch:patch}),clone:structuredClone,status(){},safe:f=>f};
+vm.runInNewContext('//'+src,ctx);nodes['opm-user-save'].onclick();assert.equal(JSON.parse(stored)[0].name,'Soft Grand');assert.equal(ctx.opmPresets.length,1);patch.algorithm=7;assert.equal(ctx.opmPresets[0].patch.algorithm,4);ctx.opmPresets.length=0;ctx.loadUserOpm();assert.equal(ctx.opmPresets.length,1);console.log('User OPM tones: save, independent copy, reload passed');

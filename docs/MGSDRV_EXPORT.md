@@ -1,49 +1,68 @@
 # MGSDRV出力
 
-「ゲームへ出力 → MGSDRV (.mgs)」で保存します。MCPでは `export_song` に
-`format: "mgs"` と拡張子を除く `filename` を指定します。
-画面からの保存名はMSX-DOS用に英数字等8文字以内にします。MCPでも実機用には8文字以内の名前を推奨します。
-エディタの曲を直接変換するため、MGSCのインストールは不要です。
+「ゲームへ出力 → MGSDRV (.mgs)」で保存します。MCPは `export_song` に
+`format: "mgs"` と新しい `filename` を指定します。MGSCのインストールは不要です。
+実機用のファイル名は英数字8文字以内にしてください（例: CLOCKWRK.MGS）。
 
 ## 対応範囲
 
-- PSG 3、SCC 5、OPLL 9チャンネル（メロディモード）。
-- 音程、1/60秒単位の開始・終了、音量、休符。
-- OPLLの15 ROM音色と共通カスタム音色、SCCの32バイト波形。
-- ミュート、全曲ループ、途中からのループ。soloは試聴専用で出力に反映しません。
-- 曲名はShift-JIS系CP932で保存。表現できない文字は `?`、制御文字は空白に置換。
+- PSG 3＋SCC 5＋OPLL 9旋律、またはPSG 3＋SCC 5＋OPLL 6旋律＋5種類のリズム音。
+- FMのROM音色・共通カスタム音色・ノート別音色と、SCCの32サンプル波形。
+- 音量、休符、ミュート、全曲／途中ループ。soloとMASTERは試聴専用です。
+- OPLLのデチューン、遅延ビブラート、ポルタメント。
+- 曲名はCP932。表現できない文字は `?`、制御文字は空白に置換します。
 
-MGS303のフレーム長命令を使用し、細かな発音タイミングを保存します。
-MGSDRV v3対応プレイヤーで再生してください。更新周波数60 Hz専用です。
-50 Hzの曲、1フレーム未満の音、バイナリ部分が16 KiBを超える曲はエラーになります。
-音符を黙って省略したり、曲を切り詰めたりはしません。
-標準SCCの4/5チャンネルは波形を共有します。
+60 Hz専用で、ファイル全体が16 KiB以内です。大きすぎる曲はエラーにし、
+パートの削除や曲の切り詰めは行いません。標準SCCの4/5チャンネルは波形を共有します。
+PSGノイズ／PSGドラムのMGS出力は未対応です。WAV・VGM・レジスタ出力を使用してください。
 
-音程テーブルの丸め、音源ごとのミックス比、FMの発音処理はMGSDRVとエディタで
-異なるため、完全に同一の波形にはなりません。MASTER音量補正は試聴専用です。
-NTSC実機相当の約59.94 Hzでは、エディタの60 Hzより演奏時間がわずかに長くなります。
-MGSから編集データへのインポートは未対応です。編集用JSONも保存してください。
-ゲーム開発パックZIPの既存内容は変えず、MGSは個別出力です。
+## エディタ再生との違い
 
-## MSXで聴く
+基本的な旋律曲は従来のMGS303フレーム長命令で出力します。
+OPLLリズム、ノート別音色、音程奏法のある曲は、MGS313のコンパクトな命令を使います。
+MGSDRV v3.13以降が必要です。現在の推奨は公式配布のv3.20です。
 
-生成した `.mgs` をMSXのストレージにコピーし、MGSDRV v3対応のプレイヤーで開きます。
-全パートを聴くにはPSGに加えMSX-MUSIC/FM-PAC相当のOPLLと標準SCCが必要です。
-プレイヤーに合わせたRAM・DOS等の条件は、[MGSDRV公式配布元](https://gigamix.hatenablog.com/entry/mgsdrv/)
-の「聴くための最低限の動作環境とファイル」を参照してください。
-MGSDRV本体、MSX用プレイヤー、BIOS、DOSは本ツールに同梱しません。
+MGS313への変換は録音と完全同一ではありません。
 
-## 検証
+- タイミングは、ドライバ内で音長がゼロにならない最小グリッドに丸めます。
+  グリッドはPPQ96で `ceil(BPM×2/75)` tick。開始・終了の通常の移動量はその半分以内です。
+  曲末はグリッドへ切り下げます。短すぎて消える音符はエラーにします。
+- ビブラートはMGSDRVの三角波LFOに近似します。開始遅延は反映しますが、
+  エディタの正弦波と100msの深さフェードインは再現しません。速度・深さにも丸めがあります。
+- ポルタメントはMGSDRVのスライド命令に変換します。曲線や分解能が異なり、
+  音長より長いスライドはその音の長さで終わります。
+- OPLLドラムは各打点と音量を保存し、減衰はMGSDRVのリズム音に任せます。
+  エディタの短いノート終了で打ち切る動作は再現しません。
+- 音程テーブル、キーオン処理、実機の音源間ミックス比も異なります。
+  NTSC実機相当の約59.94 Hzでは、60 Hzの検証環境より少し長く再生されます。
 
-2026-09-24: libkssのMGSDRV実行環境で全17チャンネルの音程・音量、FMプリセット、
-カスタム音色、途中ループと演奏終了を検証。「Moonlit Letters」は約10 KiBで全曲再生を確認。
-通常のPythonテストではチャンネル順序、休符・長音、波形データ、サイズ制限、
-HTTP/MCP出力、入力データの不変性も確認しています。物理MSX実機では未検証です。
+元の編集データは変更しません。MGSから編集データへのインポートは未対応なので、
+編集用JSONも保存してください。ゲーム開発パックZIPの内容は従来どおりで、MGSは個別出力です。
 
-フォーマット参考: [MGSDRV v3 data format](https://github.com/digital-sound-antiques/mgsc/blob/master/mgs-format.md)。
-出力処理は独自実装で、他プロジェクトのコンパイラやドライバのバイナリは含みません。
+## Turbo R＋SCCで聴く
 
+Turbo Rの内蔵MSX-MUSICとSCCカートリッジを使い、MSX-DOS2／Nextor上の
+MGSELを推奨します。SCCカートリッジは電源を切った状態で接続してください。
 
-### OPLL rhythm (experimental)
-Optional `opllRhythm: true` reserves OPLL channels 6–8 (zero based) for percussion. MIDI keys: channel 6 = 36 (bass drum), channel 7 = 38 (snare) / 42 (hi-hat), channel 8 = 45 (tom) / 49 (cymbal). Each track remains monophonic. Instrument is ignored on these three channels. Use velocity 1–15 and explicit short note durations; notes must last at least one frame. Omit the field for unchanged nine-channel melodic playback. WAV, VGM, register JSON and game bundles support rhythm; MGS export rejects rhythm songs explicitly. No hardware validation yet.
-Reference: [Yamaha YM2413 application manual](https://www.smspower.org/maxim/Documents/YM2413ApplicationManual).
+1. [公式配布元](https://gigamix.hatenablog.com/entry/mgsdrv/)からMGSDRV v3.20とMGSELを入手します。
+2. 展開したファイルと出力した `.MGS` を実機のストレージにコピーします。
+3. MSX-DOS2／Nextorで `MGSDRV /Z` を実行し、常駐を確認します。
+4. `MGSEL` を起動し、一覧から曲を選びます。終了はEscです。
+
+RAMやDOSなどの細かな条件は配布元の説明も確認してください。
+MGSDRV、MGSEL、BIOS、DOSは本ツールに同梱しません。
+
+## 検証範囲
+
+2026-09-26: libkss上で実際のMGSDRVを実行し、全曲終了、FMのキーオン回数、
+OPLLの5種類の打点、音色切り替え、ビブラート、スライドを検証しました。
+通常のテストでは入力データ不変、音符・休符、長い無音区間、途中ループの音色／奏法状態復元、
+サイズ制限、短すぎる音符の拒否を確認しています。物理MSX実機では未検証です。
+
+以前のMGS303経路は維持し、従来の17チャンネル・音色・波形・ループのテストも実行します。
+出力処理は独自実装で、第三者のコンパイラ／ドライバのバイナリは含めていません。
+
+仕様参考: [MGSDRV v3 data format](https://github.com/digital-sound-antiques/mgsc/blob/master/mgs-format.md)、
+[公式MML仕様](https://www.gigamix.jp/mgsdrv/MGSC111.TXT)。
+
+OPMオプション有効時は、空トラック・ミュート状態でもMGS出力を拒否します。WAV / VGM / JSONを使用してください。

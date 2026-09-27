@@ -1,0 +1,4 @@
+OPLL preset register data: emu2413 default_inst, MIT.
+Source: https://github.com/digital-sound-antiques/emu2413/blob/11676f6c43af7a53a0a940f8faea57eed73a22ba/emu2413.c
+YM2413 data by Mitsutaka Okazaki and contributors. VRC7 presets credited upstream to Nuke.YKT. YMF281B presets credited to Chabin and plgDavid.
+45 melodic presets extracted without register changes. Rhythm and empty user entries omitted. Played through existing ymfm YM2413, not emu2413. VRC7/YMF281B chip-specific behavior is not emulated by selecting these patches.

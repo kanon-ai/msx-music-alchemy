@@ -42,3 +42,36 @@ footer{height:auto;min-height:34px;padding:14px 0 0;margin-top:19px;border-top:1
 .editor-tools{flex-wrap:wrap}
 #track-edit-dialog label{margin-top:10px}
 #track-edit-open{display:inline-block}.editor-tools #drag-audition{width:auto}
+
+.tracks > .opm-option{flex-direction:row;align-items:center;gap:6px;padding:10px;white-space:nowrap}
+.tracks > .opm-option > input[type=checkbox]{width:auto;margin:0;flex:0 0 auto}
+
+/* Scrollable bar navigation: stable widths for long songs. */
+#overview{position:relative;overflow-x:auto;overflow-y:hidden;height:51px;scrollbar-width:thin;overscroll-behavior-x:contain}
+#overview button{flex:0 0 42px;min-width:42px;height:35px}
+
+/* Per-part colors and discoverable background notes. */
+.track-swatch{width:9px;height:16px;border-radius:2px;flex:0 0 9px;border:1px solid #ffffff55}
+.track.selected{border-left-color:var(--chip)}
+.track-color-label{flex-direction:row;align-items:center;justify-content:space-between}
+#track-color{width:48px;height:30px;padding:2px;cursor:pointer}
+#notes .note{background:var(--chip)!important;color:var(--note-ink);border-color:#10182088}
+#notes .note.selected{background:var(--chip)!important;color:var(--note-ink);outline:2px solid white;z-index:4}
+#notes .note.ghost{background:var(--chip)!important;opacity:.5;pointer-events:auto;cursor:pointer;border:1px solid #10182088}
+#notes .note.ghost:hover{opacity:1;z-index:5;outline:1px solid white}
+#notes .note.sounding{opacity:1;box-shadow:inset 0 0 0 2px white,0 0 5px var(--chip)}
+.track.sounding .track-swatch{box-shadow:0 0 7px var(--chip);outline:1px solid white}
+#velocities i{background:var(--chip)}
+
+#roll-bar-scroll{overflow-x:scroll;overflow-y:hidden;width:100%;height:22px;background:#17222c;scrollbar-color:#8abce4 #23313e;scrollbar-width:auto}
+#roll-bar-scroll-content{height:1px;pointer-events:none}
+#roll-bar-scroll::-webkit-scrollbar{height:16px}
+#roll-bar-scroll::-webkit-scrollbar-track{background:#23313e}
+#roll-bar-scroll::-webkit-scrollbar-thumb{background:#8abce4;border:3px solid #23313e;border-radius:7px}
+#track-list .track.note-hover{background:color-mix(in srgb,var(--chip) 28%,#18212a);outline:2px solid var(--chip);outline-offset:-2px}
+#track-list .track.note-hover .track-name{color:#fff;font-weight:700}
+#track-list .track.note-hover .track-swatch{box-shadow:0 0 10px var(--chip)}
+
+#velocities{height:100px;touch-action:none}#velocities i{width:9px;cursor:ns-resize;border-radius:3px;min-height:5px;touch-action:none}#velocities i:focus,#velocities i:hover{outline:2px solid white;z-index:2}#track-preview-panel{padding:18px;margin:12px 0;background:#19232c;border:1px solid #435363;border-radius:6px}#track-preview-panel h3{font-size:13px;margin-bottom:14px}.preview-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:12px}.preview-controls label:first-child{flex:1;min-width:180px}.preview-controls select{max-width:100%;width:100%}.preview-controls input[type=range]{width:150px}.preview-controls button{padding:8px}.preview-controls #preview-state{color:#edc987;font-size:11px}
+
+.roll-pitch-layout{display:flex;min-width:0}.roll-pitch-layout .roll-scroll{flex:1;min-width:0}#roll-pitch-scroll{height:384px;width:18px;flex:0 0 18px;overflow-y:scroll;overflow-x:hidden;scrollbar-color:#82b8df #24313e;scrollbar-width:auto}#roll-pitch-scroll-content{width:1px;height:1152px}#roll-pitch-scroll::-webkit-scrollbar{width:16px}#roll-pitch-scroll::-webkit-scrollbar-track{background:#24313e}#roll-pitch-scroll::-webkit-scrollbar-thumb{background:#82b8df;border-radius:8px;border:3px solid #24313e}#roll-view .ruler{padding-right:18px}#roll-bar-scroll,#velocities{margin-right:18px}#track-preview-panel{padding:9px 12px;margin-top:5px}#track-preview-panel h3{font-size:11px;margin-bottom:7px}.preview-controls{gap:6px;margin-bottom:6px}.preview-controls label{gap:3px}.preview-controls button{padding:5px 8px}.preview-controls select,.preview-controls input{padding:4px 6px}.preview-volume-fields{display:flex;align-items:center;gap:5px}.preview-controls input[type=range]{width:100px}.preview-controls input[type=number]{width:54px}.preview-help{font-size:10px;color:#9aafbd}.preview-help summary{cursor:pointer}.preview-help p{margin-top:6px}

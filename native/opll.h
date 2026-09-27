@@ -3,6 +3,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+void *msx_opm_new(void);
+void msx_opm_write(void *, unsigned, unsigned);
+double msx_opm_calc(void *);
+void msx_opm_mask(void *, unsigned);
+void msx_opm_delete(void *);
 void *msx_opll_new(void);
 void msx_opll_write(void *opll, unsigned reg, unsigned value);
 void msx_opll_mask(void *opll, unsigned mask);

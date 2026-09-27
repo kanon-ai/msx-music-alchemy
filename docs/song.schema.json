@@ -66,7 +66,7 @@
     "tracks": {
       "type": "array",
       "minItems": 17,
-      "maxItems": 17,
+      "maxItems": 25,
       "items": {
         "type": "object",
         "required": [
@@ -91,7 +91,8 @@
             "enum": [
               "PSG",
               "OPLL",
-              "SCC"
+              "SCC",
+              "OPM"
             ]
           },
           "channel": {
@@ -172,37 +173,37 @@
                   "type": "integer",
                   "minimum": -100,
                   "maximum": 100,
-                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                  "description": "Optional; melodic OPLL or OPM. See AI_COMPOSITION.md."
                 },
                 "vibratoDepth": {
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 100,
-                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                  "description": "Optional; melodic OPLL or OPM. See AI_COMPOSITION.md."
                 },
                 "vibratoRate": {
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 100,
-                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                  "description": "Optional; melodic OPLL or OPM. See AI_COMPOSITION.md."
                 },
                 "vibratoDelayMs": {
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 2000,
-                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                  "description": "Optional; melodic OPLL or OPM. See AI_COMPOSITION.md."
                 },
                 "portamentoFrom": {
                   "type": "integer",
                   "minimum": 24,
                   "maximum": 95,
-                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                  "description": "Optional; melodic OPLL or OPM. See AI_COMPOSITION.md."
                 },
                 "portamentoMs": {
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 2000,
-                  "description": "Optional; melodic OPLL only. See AI_COMPOSITION.md."
+                  "description": "Optional; melodic OPLL or OPM. See AI_COMPOSITION.md."
                 }
               }
             }
@@ -224,6 +225,103 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 2000
+          },
+          "opmPatch": {
+            "type": "object",
+            "required": [
+              "algorithm",
+              "feedback",
+              "operators"
+            ],
+            "properties": {
+              "algorithm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 7
+              },
+              "feedback": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 7
+              },
+              "operators": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "dt1",
+                    "mul",
+                    "tl",
+                    "ks",
+                    "ar",
+                    "d1r",
+                    "d2r",
+                    "dt2",
+                    "sl",
+                    "rr"
+                  ],
+                  "properties": {
+                    "dt1": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 7
+                    },
+                    "mul": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 15
+                    },
+                    "tl": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 127
+                    },
+                    "ks": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3
+                    },
+                    "ar": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 31
+                    },
+                    "d1r": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 31
+                    },
+                    "d2r": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 31
+                    },
+                    "dt2": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3
+                    },
+                    "sl": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 15
+                    },
+                    "rr": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 15
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "description": "Optional per-track display color; does not affect audio."
           }
         }
       }
@@ -232,6 +330,41 @@
       "type": "boolean",
       "default": false,
       "description": "Optional. Six melodic OPLL channels plus rhythm on channels 6..8 (zero-based); see AI_COMPOSITION.md."
+    },
+    "opmEnabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Optional SFG/YM2151 8 channels. MGSDRV export forbidden while enabled."
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "opmEnabled"
+        ],
+        "properties": {
+          "opmEnabled": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tracks": {
+            "minItems": 25,
+            "maxItems": 25
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "tracks": {
+            "minItems": 17,
+            "maxItems": 17
+          }
+        }
+      }
+    }
+  ]
 }

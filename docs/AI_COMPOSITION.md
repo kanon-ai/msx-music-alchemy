@@ -39,15 +39,15 @@ loops, intermediate instrument changes or alternate endings. Unsupported syntax 
 atomically. JSON is the lossless exchange format; MML text export is not implemented.
 
 `export_song` format `mgs` exports the editor song directly as MGSDRV v3 data using
-frame-duration commands (MGS303). Supports all 17 channels, the shared custom OPLL
+frame-duration commands (MGS303) for basic songs, or native MGS313 for expressive/rhythm songs. Supports all 17 melodic channels, the shared custom OPLL
 patch, SCC waves, mute and nonzero loop starts. Requires 60 Hz and at most 16 KiB
-of binary data; unsupported/oversize songs fail explicitly without truncation.
+including the text header; unsupported/oversize songs fail explicitly without truncation.
 MSX playback needs MGSDRV and a compatible player, supplied separately. Driver
 tuning and hardware mix levels can differ from the editor. See MGSDRV_EXPORT.md.
 
 
 ### OPLL rhythm (experimental)
-Optional `opllRhythm: true` reserves OPLL channels 6–8 (zero based) for percussion. MIDI keys: channel 6 = 36 (bass drum), channel 7 = 38 (snare) / 42 (hi-hat), channel 8 = 45 (tom) / 49 (cymbal). Each track remains monophonic. Instrument is ignored on these three channels. Use velocity 1–15 and explicit short note durations; notes must last at least one frame. Omit the field for unchanged nine-channel melodic playback. WAV, VGM, register JSON and game bundles support rhythm; MGS export rejects rhythm songs explicitly. No hardware validation yet.
+Optional `opllRhythm: true` reserves OPLL channels 6–8 (zero based) for percussion. MIDI keys: channel 6 = 36 (bass drum), channel 7 = 38 (snare) / 42 (hi-hat), channel 8 = 45 (tom) / 49 (cymbal). Each track remains monophonic. Instrument is ignored on these three channels. Use velocity 1–15 and explicit short note durations; notes must last at least one frame. Omit the field for unchanged nine-channel melodic playback. WAV, VGM, register JSON, game bundles and MGS support rhythm. MGS uses native drum decay rather than the editor note-off lengths. No hardware validation yet.
 Reference: [Yamaha YM2413 application manual](https://www.smspower.org/maxim/Documents/YM2413ApplicationManual).
 
 ### Reusable arrangement recipes
@@ -66,4 +66,20 @@ Call `preview_note_expression(song, trackId, startTick, minimumDurationMs)` for 
 
 Optional note fields (melodic OPLL only): instrument 0..15, detuneCents -100..100, vibratoDepth 0..100 cents, vibratoRate 1..100 in tenths Hz (48=4.8Hz), vibratoDelayMs 0..2000, portamentoFrom MIDI24..95, portamentoMs 0..2000. Depth/time zero disables. Absent rate=5Hz, absent delay=0; explicitly specify delay240 for delayed vibrato. Depth ramps up over100ms. Detune example: echo +6 cents. Portamento is an explicit start-pitch slide with normal key-on, not legato; use sparingly on connected long notes, about65ms for 1..2-semitone moves. Do not infer portamento use from mixed reference audio alone.
 
-WAV/VGM/register streams include expression at song50/60Hz. MGS rejects note-specific instruments and active expression instead of silently dropping it. Preserve source backup and compare with fixed volume; no-expression songs retain prior register output.
+WAV/VGM/register streams include expression at song50/60Hz. MGS maps note-specific instruments and active OPLL expression to native commands. Vibrato becomes a triangle LFO without the editor sine-wave fade-in; glide shape, pitch rounding, timing grid and drum decay differ. Notes too short for the safe native grid fail explicitly. Preserve source backup and compare with fixed volume; no-expression songs retain prior register output.
+
+## Optional SFG / OPM
+
+Enable `SFG / OPMを使用` in the channel panel to add eight independent YM2151 voices (25 tracks total). Disabled by default; existing 17-track projects retain their sound. To disable, first save and clear the OPM notes; disabling never silently deletes a part. MGSDRV export is rejected whenever this option is enabled, even if OPM tracks are empty or muted.
+
+Each OPM track has its own four-operator `opmPatch`: algorithm and feedback 0–7, plus operators in algorithm order (register offsets 0, 16, 8, 24). Parameters: DT1 0–7, MUL 0–15, TL 0–127, KS 0–3, AR/D1R/D2R 0–31, DT2 0–3, SL/RR 0–15. Higher TL means quieter. Velocity adds attenuation only to the algorithm's carriers. No other OPM channel shares this patch.
+
+Delayed software vibrato, detune and portamento use the same note fields as melodic OPLL. Live mute/solo, drag audition, track copying, WAV, VGM and register exports support OPM. Preview/WAV remain mono; pan, hardware LFO, OPM noise and SFG MIDI functions are not exposed. Emulation uses YM2151 at 3,579,545 Hz; distinct YM2164 behavior and physical SFG playback are unverified.
+
+MCP: get_song → configure_opm(song, enabled=true) → get_opm_patch_template → edit OPM notes and opmPatch → validate_song → set_song with current revision. configure_opm returns a copy and does not save. JSON can also be edited directly.
+
+### OPMプリセットをMCPから選択する
+
+`list_opm_presets` に `{"query":"bass"}` や `{"query":"lead"}` を渡すと、エディタと同じ音色一覧を検索できます。空の引数で全件を取得します。`get_opm_preset` に一覧の `id` を渡すと、編集可能な `patch` を取得できます。
+
+`get_song` で取得した曲の対象OPMトラックの `opmPatch` に代入し、`validate_song` を通してから、取得時のrevisionで `set_song` を実行してください。検索・取得だけでは現在の曲や再生を変更しません。OPMは各チャンネルで独立した音色を使用できます。OPM有効時のMGSDRV出力制限は継続します。

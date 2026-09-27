@@ -67,3 +67,7 @@ not establish correct slot handling, port delays, CPU load, or ROM bank placemen
 WAV is a preview at 44.1 kHz / 16-bit mono using emu2149, ymfm (YM2413) and emu2212. It includes
 one song pass and a short release tail; loops are represented in project/VGM/stream metadata.
 Mixer scaling is fixed; it is not a calibrated model of a particular MSX's analog output.
+
+## Optional OPM
+
+Register stream chip ID 3 is YM2151 (SFG), clock 3579545 Hz. `MSX_SONG_OPM` is 1 for OPM-enabled headers. Implement `msx_write(3, reg, value)` with appropriate SFG slot mapping and register timing; the portable player does not provide that hardware adapter. MGS cannot carry OPM. WAV/VGM emulation is not a physical-hardware playback test.

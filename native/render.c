@@ -16,23 +16,24 @@ int main(void) {
   _setmode(_fileno(stdin), _O_BINARY); _setmode(_fileno(stdout), _O_BINARY);
 #endif
   if(getchar()!='M'||getchar()!='S'||getchar()!='R') return 2;
-  int version=getchar(); if(version!='1' && version!='2') return 2;
+  int version=getchar(); if(version!='1' && version!='2' && version!='3') return 2;
+  int live=version!='1', chips=version=='3'?4:3;
   unsigned hz=read16(), lo=read16(), frames=lo|(read16()<<16);
   if((hz!=50&&hz!=60)||frames>18060) return 2;
-  PSG *psg=PSG_new(1789773,44100); void *opll=msx_opll_new(); SCC *scc=SCC_new(3579545,44100);
+  PSG *psg=PSG_new(1789773,44100); void *opll=msx_opll_new(), *opm=NULL; SCC *scc=SCC_new(3579545,44100);
   if(!psg||!opll||!scc) return 3;
   PSG_setVolumeMode(psg,2); PSG_setQuality(psg,1); PSG_reset(psg);
   SCC_set_type(scc,SCC_STANDARD); SCC_set_quality(scc,1); SCC_reset(scc); SCC_write(scc,0x9000,0x3f);
-  unsigned masks[3]={0,0,0}, wanted[3]={0,0,0}, fade=128, batch=0;
-  for(unsigned f=0;version=='2'||f<frames;f++) {
-    if(version=='2' && batch==0) {
+  unsigned masks[4]={0,0,0,0}, wanted[4]={0,0,0,0}, fade=128, batch=0;
+  for(unsigned f=0;live||f<frames;f++) {
+    if(live && batch==0) {
       batch=read16(); if(!batch) break; if(batch>12) return 2;
-      for(unsigned c=0;c<3;c++) wanted[c]=read16();
-      if(wanted[0]>7 || wanted[1]>511 || wanted[2]>31) return 2;
+      for(unsigned c=0;c<chips;c++) wanted[c]=read16();
+      if(wanted[0]>7 || wanted[1]>511 || wanted[2]>31 || wanted[3]>255) return 2;
       if(f==0) {
-        for(unsigned c=0;c<3;c++) masks[c]=wanted[c];
-        PSG_setMask(psg,masks[0]); msx_opll_mask(opll,masks[1]); SCC_setMask(scc,masks[2]);
-      } else if(masks[0]!=wanted[0]||masks[1]!=wanted[1]||masks[2]!=wanted[2]) fade=0;
+        for(unsigned c=0;c<chips;c++) masks[c]=wanted[c];
+        PSG_setMask(psg,masks[0]); msx_opll_mask(opll,masks[1]); SCC_setMask(scc,masks[2]); msx_opm_mask(opm,masks[3]);
+      } else if(masks[0]!=wanted[0]||masks[1]!=wanted[1]||masks[2]!=wanted[2]||masks[3]!=wanted[3]) fade=0;
     }
     unsigned count=read16(); if(count>1024) return 2;
     for(unsigned j=0;j<count;j++) {
@@ -40,23 +41,24 @@ int main(void) {
       if(chip==0) PSG_writeReg(psg,reg,val);
       else if(chip==1) msx_opll_write(opll,reg,val);
       else if(chip==2) SCC_write(scc,0x9800+reg,val);
+      else if(chip==3) { if(!opm) { opm=msx_opm_new(); if(!opm) return 3; msx_opm_mask(opm,masks[3]); } msx_opm_write(opm,reg,val); }
       else return 2;
     }
     for(unsigned i=0;i<44100/hz;i++) {
       double gain=1;
-      if(version=='2' && fade<128) {
+      if(live && fade<128) {
         if(fade==64) {
-          for(unsigned c=0;c<3;c++) masks[c]=wanted[c];
-          PSG_setMask(psg,masks[0]); msx_opll_mask(opll,masks[1]); SCC_setMask(scc,masks[2]);
+          for(unsigned c=0;c<chips;c++) masks[c]=wanted[c];
+          PSG_setMask(psg,masks[0]); msx_opll_mask(opll,masks[1]); SCC_setMask(scc,masks[2]); msx_opm_mask(opm,masks[3]);
         }
         gain=fade<64 ? (64-fade)/64.0 : (fade-64)/64.0; ++fade;
       }
-      int sample=(int)(PSG_calc(psg)*0.75+msx_opll_calc(opll)*0.65+SCC_calc(scc)*0.65);
+      int sample=(int)(PSG_calc(psg)*0.75+msx_opll_calc(opll)*0.65+SCC_calc(scc)*0.65+msx_opm_calc(opm));
       sample=(int)(sample*gain);
       if(sample>32767)sample=32767; if(sample< -32768)sample=-32768;
       putchar(sample&255); putchar((sample>>8)&255);
     }
-    if(version=='2' && --batch==0) fflush(stdout);
+    if(live && --batch==0) fflush(stdout);
   }
-  PSG_delete(psg); msx_opll_delete(opll); SCC_delete(scc); return ferror(stdout)?4:0;
+  PSG_delete(psg); msx_opll_delete(opll); SCC_delete(scc); msx_opm_delete(opm); return ferror(stdout)?4:0;
 }

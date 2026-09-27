@@ -17,7 +17,7 @@ function transformTrack(input,sourceId,options){
    const partner=p.tracks.find(t=>t.chip==='SCC'&&t.channel===(dst.channel===3?4:3));
    if(JSON.stringify(partner.wave)!==JSON.stringify(src.wave))throw Error('SCC 4 / 5は波形共有です。共有先と異なる波形はコピーできません。');
   }
-  for(const k of ['instrument','wave','psgMode','noisePeriod','decayMs']){
+  for(const k of ['instrument','wave','psgMode','noisePeriod','decayMs','opmPatch']){
    if(k in src)dst[k]=structuredClone(src[k]);else delete dst[k];
   }
  }

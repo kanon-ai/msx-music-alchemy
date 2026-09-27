@@ -5,7 +5,7 @@ class LivePlayer {
   this.closed=false;this.session=null;this.node=null;this.worker=null;this.samples=0;this.masks=[0,0,0];this.underruns=0;
  }
  setMix(song,solo){
-  const masks=[0,0,0],chips={PSG:0,OPLL:1,SCC:2};
+  const masks=song.opmEnabled?[0,0,0,0]:[0,0,0],chips={PSG:0,OPLL:1,SCC:2,OPM:3};
   song.tracks.forEach((t,i)=>{if(solo===null?t.mute:i!==solo)masks[chips[t.chip]]|=1<<t.channel;});this.masks=masks;
   this.worker?.postMessage({masks});
  }

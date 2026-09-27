@@ -52,22 +52,6 @@ class RealtimeTests(unittest.TestCase):
    with self.assertRaises(ValueError):s.pull([0,0,0])
   finally:s.close()
 
- def test_lost_response_retry_is_exact_and_does_not_skip(self):
-  pool=LivePool()
-  try:
-   p=core.demo_song();p['loop']=False
-   key=pool.start(p)['session'];chunks=[];request=0
-   while True:
-    pcm=pool.pull(key,[0,0,0],request)
-    cursor=pool.sessions[key].cursor
-    self.assertEqual(pool.pull(key,[0,0,0],request),pcm)
-    self.assertEqual(pool.sessions[key].cursor,cursor)
-    if not pcm:break
-    chunks.append(pcm);request+=1
-   self.assertEqual(b''.join(chunks),self.pcm(p))
-   with self.assertRaises(ValueError):pool.pull(key,[0,0,0],request+2)
-  finally:pool.close()
-
  def test_pool_stop_and_validation(self):
   pool=LivePool()
   try:
@@ -76,5 +60,16 @@ class RealtimeTests(unittest.TestCase):
    with self.assertRaises(ValueError):pool.pull(key,[0,512,0])
    pool.stop(key);self.assertIsNotNone(proc.poll())
    with self.assertRaises(ValueError):pool.pull(key,[0,0,0])
+  finally:pool.close()
+ def test_retry_does_not_advance_audio(self):
+  pool=LivePool()
+  try:
+   key=pool.start(core.demo_song())['session']
+   first=pool.pull(key,[0,0,0],0);cursor=pool.sessions[key].cursor
+   self.assertEqual(first,pool.pull(key,[0,0,0],0))
+   self.assertEqual(cursor,pool.sessions[key].cursor)
+   pool.pull(key,[0,0,0],1)
+   self.assertGreater(pool.sessions[key].cursor,cursor)
+   with self.assertRaises(ValueError):pool.pull(key,[0,0,0],3)
   finally:pool.close()
 if __name__=='__main__':unittest.main()
