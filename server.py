@@ -5,6 +5,7 @@ import mimetypes
 import os
 from pathlib import Path
 import secrets
+import socket
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -47,7 +48,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed(): return self.reply(dict(error='Local access only'),403)
         route=urlparse(self.path).path
         if route=='/api/state': return self.reply(self.server.store.get())
-        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.10.0',token=self.server.token,patches=core.PATCH_NAMES,opmTracks=opm.tracks()))
+        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.10.1',token=self.server.token,patches=core.PATCH_NAMES,opmTracks=opm.tracks()))
         if route=='/api/new': return self.reply(core.new_song())
         if route=='/api/demo': return self.reply(core.demo_song())
         allowed={'/opm-presets.json':'opm-presets.json','/':'index.html','/app.js':'app.js','/style.css':'style.css','/live-player.js':'live-player.js','/live-worklet.js':'live-worklet.js','/live-worker.js':'live-worker.js','/track-edit.js':'track-edit.js','/track-preview.js':'track-preview.js'}
@@ -94,10 +95,17 @@ class Handler(BaseHTTPRequestHandler):
             print(f'Error: {e}',flush=True); self.reply(dict(error='処理に失敗しました。サーバーログを確認してください。'),500)
     def log_message(self,fmt,*args): pass
 
+class ExclusiveHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address=False
+    def server_bind(self):
+        if hasattr(socket,'SO_EXCLUSIVEADDRUSE'):
+            self.socket.setsockopt(socket.SOL_SOCKET,socket.SO_EXCLUSIVEADDRUSE,1)
+        super().server_bind()
+
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument('--port',type=int,default=7913); parser.add_argument('--no-browser',action='store_true'); args=parser.parse_args()
     url=f'http://127.0.0.1:{args.port}'
-    try: server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler)
+    try: server=ExclusiveHTTPServer(('127.0.0.1',args.port),Handler)
     except OSError:
         from urllib.request import urlopen
         try:

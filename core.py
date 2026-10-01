@@ -49,6 +49,9 @@ def validate(song):
     if type(p.get('opllRhythm',False)) is not bool: raise ValueError('opllRhythm は真偽値です。')
     end=p['bars']*384
     integer(p.get('loopStart'),0,end-1,'ループ開始位置')
+    if 'loopEnd' in p:
+        integer(p['loopEnd'],1,end,'ループ終了位置')
+        if p['loopStart']>=p['loopEnd']: raise ValueError('ループ終了位置は開始位置より後にしてください。')
     if end/PPQ*60/p['bpm']>300: raise ValueError('曲の長さは5分以内にしてください。')
     if not isinstance(p.get('opllPatch'),list) or len(p['opllPatch'])!=8: raise ValueError('OPLLカスタム音色は8バイト必要です。')
     for v in p['opllPatch']: integer(v,0,255,'OPLL音色')
@@ -136,8 +139,20 @@ def demo_song():
     p['tracks'][12]['name']='SCC arpeggio'
     return validate(p)
 
+def playback_end(song):
+    return song.get('loopEnd',song['bars']*384) if song['loop'] else song['bars']*384
+
+
+def playback_song(song):
+    p=validate(song); limit=playback_end(p)
+    for t in p['tracks']:
+        t['notes']=[n for n in t['notes'] if n['start']<limit]
+        for n in t['notes']: n['duration']=min(n['duration'],limit-n['start'])
+    return p
+
+
 def compile_song(song):
-    p=validate(song); hz=p['hz']; end=p['bars']*384
+    p=playback_song(song); hz=p['hz']; end=playback_end(p)
     frame=lambda tick: int(tick*hz*60/(p['bpm']*PPQ)+.5)
     frames=frame(end)
     if p['loop'] and frame(p['loopStart'])>=frames: raise ValueError('ループ区間は1フレーム以上必要です。')
@@ -264,6 +279,10 @@ def compile_song(song):
     for ch in range(3): write(frames,0,8+ch,0)
     for ch in range(9): write(frames,1,0x20+ch,0)
     if rhythm: write(frames,1,0x0e,0x20)
+    if p['loop'] and p.get('loopEnd',p['bars']*384)<p['bars']*384:
+        # Explicit cut: key-off alone leaves the OPLL release envelope audible.
+        for t in p['tracks']:
+            if t['chip']=='OPLL': write(frames,1,0x30+t['channel'],(t['instrument']<<4)|15)
     write(frames,2,0x8f,0)
     if p['loop'] and p['loopStart']:
         # Re-establish register state at a nonzero loop boundary, including notes

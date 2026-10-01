@@ -335,6 +335,12 @@
       "type": "boolean",
       "default": false,
       "description": "Optional SFG/YM2151 8 channels. MGSDRV export forbidden while enabled."
+    },
+    "loopEnd": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 24576,
+      "description": "Optional exclusive loop end in PPQ ticks; active only when loop is true. Notes remain stored."
     }
   },
   "allOf": [

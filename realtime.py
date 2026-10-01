@@ -13,7 +13,7 @@ class LiveSession:
     def __init__(self, song, start=0):
         p=core.validate(song)
         self.song=copy.deepcopy(p)
-        if type(start) is not int or not 0 <= start < p['bars']*384:
+        if type(start) is not int or not 0 <= start < core.playback_end(p):
             raise ValueError('再生開始位置が範囲外です。')
         # Keep silent voices running so unmute resumes their envelope and phase.
         p=copy.deepcopy(p)
@@ -72,8 +72,11 @@ class LiveSession:
     def _chunk(self,count,masks):
         packet=bytearray(struct.pack('<'+str(len(masks)+1)+'H',count,*masks))
         for _ in range(count):
-            if self.cursor==self.total and self.loop:self.cursor=self.loop_frame
-            writes=self.restore+self.events.get(self.cursor,[])
+            boundary=[]
+            if self.cursor==self.total and self.loop:
+                boundary=self.events.get(self.total,[])
+                self.cursor=self.loop_frame
+            writes=self.restore+boundary+self.events.get(self.cursor,[])
             self.restore=[]
             packet+=struct.pack('<H',len(writes))
             for w in writes:packet+=bytes(w)
@@ -131,7 +134,7 @@ class LivePool:
         with self.lock:
             if len(self.sessions)>=4:raise ValueError('再生画面が多すぎます。別画面の再生を停止してください。')
             s=LiveSession(song,start);key=secrets.token_urlsafe(24);self.sessions[key]=s
-            return dict(session=key,sampleRate=44100,hz=s.hz)
+            return dict(session=key,sampleRate=44100,hz=s.hz,frames=s.total,loop=s.loop,loopFrame=s.loop_frame,startFrame=round(start*s.hz*60/(song["bpm"]*96)))
     def pull(self,key,masks,request_id=None):
         with self.lock:s=self.sessions.get(key)
         if s is None:raise ValueError('再生セッションが終了しました。再生ボタンで再開してください。')

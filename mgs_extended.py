@@ -154,7 +154,7 @@ def rhythm_block(p,frame,end,loop):
 
 def compact_song(p):
     """Use the finest safe native-duration grid. Input data is never edited."""
-    p=copy.deepcopy(p);grid=timing_grid(p);end=p['bars']*384//grid*grid
+    p=copy.deepcopy(p);grid=timing_grid(p);end=(p.get('loopEnd',p['bars']*384) if p['loop'] else p['bars']*384)//grid*grid
     def snap(t):return min(end,round(t/grid)*grid)
     for track in p['tracks']:
         if track['mute']:continue

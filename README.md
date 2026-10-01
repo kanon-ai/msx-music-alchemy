@@ -1,4 +1,4 @@
-# MSX Music Alchemy v0.10.0 — Human UI Update 3
+# MSX Music Alchemy v0.10.1 — ループ範囲編集・再生改善
 
 音色作成機能更新: 独立したPSG / OPLL / SCC / OPM音色エディタ、共通ノブUI、SCC波形描画、自作音色ライブラリ、JISキーボード4段48キーの試奏に対応。楽曲と独立して音色を作成できます。パート単位のMML編集も追加し、検証成功時のみ反映します。
 
@@ -41,7 +41,7 @@ Python不要のWindows版はReleasesのZIPを展開し、`MSXMusicAlchemy.exe` �
 - ステップ入力: 音名ボタン／Z S X D C V G B H N J M。休符でカーソルを進める。
 - Ctrl+Z / Ctrl+Y、音程・開始・音長・音量の数値編集、小節複製、mute/solo試聴。
 - OPLL 15 ROM音色＋共通カスタム8バイト。SCCは波形プリセット／32サンプル手描き。
-- 50/60 Hz、BPM、1–64小節、ループ開始小節。曲長5分まで。
+- 50/60 Hz、BPM、1–64小節、ループ開始・終了位置を旗型タブで指定。曲長5分まで。
 - 変更は `data/autosave.json` に保存。JSON保存で任意の場所にプロジェクトを保管。
   JSON/MMLの読み込みは現在の曲を置き換えます（Undo可能）。外部変更の取得後はUndo履歴をリセット。
 - AI／他のウィンドウとの競合は通知して上書きを止めます。JSON保存で作業を退避し再読込してください。

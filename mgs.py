@@ -11,7 +11,7 @@ MAX_DATA = 0x4000
 
 
 def export_mgs(song):
-    p = core.validate(song)
+    p = core.playback_song(song)
     if p.get('opmEnabled'): raise ValueError('OPM使用時はMGSDRV出力できません。WAV / VGM / JSONを使用してください。')
     if any(t.get('psgMode') in ('noise','drums') and t['notes'] and not t['mute'] for t in p['tracks']):
         raise ValueError('PSG noise MGS export is unsupported; use WAV, VGM or register JSON')
@@ -20,7 +20,7 @@ def export_mgs(song):
     # Reuse the native compiler's frame-boundary validation, including short notes.
     core.compile_song(p)
     frame = lambda tick: (tick * 3600 + p['bpm'] * 48) // (p['bpm'] * 96)
-    end = frame(p['bars'] * 384)
+    end = frame(core.playback_end(p))
     loop = frame(p['loopStart']) if p['loop'] else None
     tracks = {(t['chip'], t['channel']): t for t in p['tracks']}
     # MGSC patch numbers 0..14 select OPLL ROM voices 1..15. Define custom at 15.

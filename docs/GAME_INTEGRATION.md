@@ -71,3 +71,7 @@ Mixer scaling is fixed; it is not a calibrated model of a particular MSX's analo
 ## Optional OPM
 
 Register stream chip ID 3 is YM2151 (SFG), clock 3579545 Hz. `MSX_SONG_OPM` is 1 for OPM-enabled headers. Implement `msx_write(3, reg, value)` with appropriate SFG slot mapping and register timing; the portable player does not provide that hardware adapter. MGS cannot carry OPM. WAV/VGM emulation is not a physical-hardware playback test.
+
+## ループ範囲（v0.10.1）
+
+楽曲JSONの `loopStart` は開始tick、任意の `loopEnd` は終了tickです（4分音符=96 tick）。省略時は曲末です。`loop=true` のときだけ終了位置で打ち切り、元の音符は保持します。レジスタ出力の `frames` が終了フレーム、`loopFrame` が繰り返し先です。初回はフレーム0から演奏し、終了時は停止書き込みの後に開始位置の書き込みを行います。WAVはループ位置を保持しません。

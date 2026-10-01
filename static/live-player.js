@@ -10,7 +10,7 @@ class LivePlayer {
   this.worker?.postMessage({masks});
  }
  async start(song,startTick){
-  const info=await (await this.api('/api/live/start',{song,startTick})).json();this.session=info.session;
+  const info=await (await this.api('/api/live/start',{song,startTick})).json();this.session=info.session;this.timing=info;
   if(this.closed){this.release();return;}
   if(!LivePlayer.modules.has(this.context)){
    const promise=this.context.audioWorklet.addModule('/live-worklet.js');LivePlayer.modules.set(this.context,promise);

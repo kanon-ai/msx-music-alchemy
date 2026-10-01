@@ -1,0 +1,14 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('static/app.js','utf8').split('function drawLoopStartMarker(){')[1];
+const elements={};const $=id=>elements[id]??=( {style:{setProperty(){}},classList:{toggle(){}},setAttribute(k,v){this[k]=v;},setPointerCapture(){},getBoundingClientRect(){return {left:0,width:384,top:100,bottom:80};}} );
+const ctx={$,song:{loop:true,loopStart:0,loopEnd:700,bpm:120},page:1,grid:24,undo:[],redo:[],end:()=>768,stop(){},changed(){},draw(){},drawLoopMarker(){},edit(fn){fn();}};
+ctx.snapshot=()=>JSON.stringify(ctx.song);
+vm.runInNewContext('function drawLoopStartMarker(){'+source,ctx);
+const marker=$('loop-start-marker'),event={button:0,pointerId:1,currentTarget:marker,clientX:120,preventDefault(){},stopPropagation(){}};
+marker.onpointerdown(event);marker.onpointermove(event);marker.onpointerup();assert.equal(ctx.song.loopStart,504);assert.equal(ctx.undo.length,1);
+marker.onkeydown({...event,key:'ArrowRight'});assert.equal(ctx.song.loopStart,528);
+marker.onkeydown({...event,key:'ArrowLeft',shiftKey:true});assert.equal(ctx.song.loopStart,527);
+marker.onpointerdown(event);marker.onpointermove({...event,clientX:384});assert.equal(ctx.song.loopStart,699);marker.onpointercancel();assert.equal(ctx.song.loopStart,527);
+ctx.drawLoopStartMarker();assert.equal(marker['aria-valuenow'],'527');assert.equal(marker.hidden,false);
+ctx.page=0;ctx.drawLoopStartMarker();assert.equal(marker.hidden,true);
+console.log('Loop start: drag, keyboard, clamp, cancel, undo and marker visibility passed');

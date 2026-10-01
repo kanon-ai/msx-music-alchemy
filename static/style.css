@@ -140,3 +140,57 @@ body.sound-mode #sound-view .fm-operator{grid-template-columns:repeat(3,minmax(0
 @media(max-width:1000px){#designer-controls[data-chip="OPM"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){#designer-controls[data-chip="OPM"],#designer-controls[data-chip="OPLL"]{grid-template-columns:1fr}}
 #sound-view .fm-operator h4{order:-1}#sound-view .fm-operator .envelope-value{order:1}
+
+#loop-end-marker{position:absolute;top:0;bottom:0;width:12px;margin-left:-6px;z-index:12;cursor:ew-resize;touch-action:none;border:0;background:linear-gradient(to right,transparent 5px,#ffca77 5px,#ffca77 7px,transparent 7px)}#loop-end-marker[hidden]{display:none}#loop-end-marker span{position:absolute;right:5px;top:0;padding:3px 5px;background:#ffca77;color:#17202a;font:10px Consolas,monospace;white-space:nowrap;border-radius:3px}#loop-end-marker:focus-visible{outline:2px solid #ffca77}#ruler-beats{cursor:crosshair}
+
+#loop-start-marker{position:absolute;top:0;bottom:0;width:12px;margin-left:-6px;z-index:12;cursor:ew-resize;touch-action:none;border:0;background:linear-gradient(to right,transparent 5px,#79cbbb 5px,#79cbbb 7px,transparent 7px)}#loop-start-marker[hidden]{display:none}#loop-start-marker span{position:absolute;left:5px;top:20px;padding:3px 5px;background:#79cbbb;color:#17202a;font:10px Consolas,monospace;white-space:nowrap;border-radius:3px}#loop-start-marker:focus-visible{outline:2px solid #79cbbb}
+
+.loop-label-row{height:38px;padding:0 18px 0 44px;background:#1c2026}
+.loop-label-track{position:relative;height:100%;overflow:hidden}
+.loop-label-track span{position:absolute;padding:2px 5px;color:#17202a;font:10px Consolas,monospace;white-space:nowrap;border-radius:3px;pointer-events:none}
+#loop-start-label{top:1px;background:#79cbbb}
+#loop-end-label{top:20px;background:#ffca77;transform:translateX(-100%)}
+.loop-label-track span[hidden]{display:none}
+
+.loop-label-track{overflow:visible}
+.loop-label-track span{pointer-events:auto;cursor:ew-resize;touch-action:none;z-index:14}
+.loop-label-track span::after{content:"";position:absolute;top:100%;width:2px;pointer-events:none}
+#loop-start-label::after{left:0;height:var(--stem-height,41px);background:#79cbbb}
+#loop-end-label::after{right:0;height:var(--stem-height,22px);background:#ffca77}
+#loop-start-label.edge-flip{transform:translateX(-100%)}
+#loop-start-label.edge-flip::after{left:auto;right:0}
+#loop-end-label.edge-flip{transform:none}
+#loop-end-label.edge-flip::after{right:auto;left:0}
+
+/* Compact loop tabs; their stems share the marker's two-pixel centre. */
+.loop-label-row{height:18px}
+#loop-start-label,#loop-end-label{top:1px}
+#roll-view .ruler{height:20px}
+#loop-start-label::after{left:-1px}
+#loop-end-label::after{right:-1px}
+#loop-start-label.edge-flip::after{left:auto;right:-1px}
+#loop-end-label.edge-flip::after{right:auto;left:-1px}
+
+/* Match the tab stem and roll marker with the same solid 2px stroke. */
+#loop-start-marker,#loop-end-marker{background:none}
+#loop-start-marker::before,#loop-end-marker::before{content:"";position:absolute;left:5px;top:0;bottom:0;width:2px;pointer-events:none}
+#loop-start-marker::before{background:#79cbbb}
+#loop-end-marker::before{background:#ffca77}
+
+/* One uninterrupted stroke from the tab to the roll bottom avoids clipping
+   a second stroke at the roll boundary (especially the right edge). */
+#loop-start-marker::before,#loop-end-marker::before{display:none}
+.loop-label-track span::after{border-radius:0}
+
+/* Square the attachment corner so the stem meets the tab without a notch. */
+#loop-start-label{border-bottom-left-radius:0}
+#loop-end-label{border-bottom-right-radius:0}
+#loop-start-label.edge-flip{border-bottom-left-radius:3px;border-bottom-right-radius:0}
+#loop-end-label.edge-flip{border-bottom-right-radius:3px;border-bottom-left-radius:0}
+#loop-start-label::after,#loop-end-label::after{top:calc(100% - 1px);height:calc(var(--stem-height) + 1px)}
+
+/* Flag poles sit inside and flush with the flag's attachment edge. */
+#loop-start-label::after{left:0;right:auto}
+#loop-end-label::after{right:0;left:auto}
+#loop-start-label.edge-flip::after{left:auto;right:0}
+#loop-end-label.edge-flip::after{right:auto;left:0}
