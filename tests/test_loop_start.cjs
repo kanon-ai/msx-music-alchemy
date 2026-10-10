@@ -1,5 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const source=fs.readFileSync('static/app.js','utf8').split('function drawLoopStartMarker(){')[1];
+const source=fs.readFileSync('static/app.js','utf8').split('function drawLoopStartMarker(){')[1].split("$('loop-end-bar').onchange")[0];
 const elements={};const $=id=>elements[id]??=( {style:{setProperty(){}},classList:{toggle(){}},setAttribute(k,v){this[k]=v;},setPointerCapture(){},getBoundingClientRect(){return {left:0,width:384,top:100,bottom:80};}} );
 const ctx={$,song:{loop:true,loopStart:0,loopEnd:700,bpm:120},page:1,grid:24,undo:[],redo:[],end:()=>768,stop(){},changed(){},draw(){},drawLoopMarker(){},edit(fn){fn();}};
 ctx.snapshot=()=>JSON.stringify(ctx.song);

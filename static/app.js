@@ -55,6 +55,7 @@ function refreshInputs(){
  $('opm-enabled').checked=!!song.opmEnabled;$('channel-count').textContent=song.tracks.length+' MONO';
  document.querySelector('[data-format="mgs"]').disabled=!!song.opmEnabled;$('opm-export-help').hidden=!song.opmEnabled;
  $('title').value=song.title;$('bpm').value=song.bpm;$('bars').value=song.bars;$('hz').value=song.hz;$('loop').checked=song.loop;$('loopStart').value=Math.floor(song.loopStart/384)+1;
+ $('loop-end-bar').value=Number(((song.loopEnd??end())/384+1).toFixed(5));
  $('loop-end').value=song.loopEnd===undefined?'':Number((song.loopEnd/96*60/song.bpm).toFixed(3));
  $('page').replaceChildren();for(let i=0;i<song.bars;i++){const o=new Option(String(i+1).padStart(2,'0'),i);$('page').add(o);}$('page').value=page;
 }
@@ -113,7 +114,7 @@ $('roll-bar-scroll').addEventListener('scroll',()=>{
 });
 window.addEventListener('resize',()=>{if(song)syncRollScroll();});
 function highlightPart(i){document.querySelectorAll('#track-list .track').forEach(el=>el.classList.toggle('note-hover',Number(el.dataset.trackIndex)===i));}
-function drawRoll(){drawLoopMarker();highlightPart(-1);syncRollScroll();syncPitchScroll();drawRange();
+function drawRoll(){drawLoopMarker();drawCutMarkers();highlightPart(-1);syncRollScroll();syncPitchScroll();drawRange();
  const piano=$('piano'),lines=$('grid-lines');piano.replaceChildren();lines.replaceChildren();$('ruler-beats').replaceChildren();
  for(let i=0;i<4;i++){const s=document.createElement('span');s.textContent=`${page+1}.${i+1}`;$('ruler-beats').append(s);}
  for(let i=0;i<24;i++){
@@ -769,7 +770,7 @@ $('loop-end-marker').onpointermove=e=>{
  const r=$('roll').getBoundingClientRect(),step=e.shiftKey?1:grid;
  const local=Math.max(0,Math.min(384,Math.round((e.clientX-r.left)/r.width*384/step)*step));
  song.loopEnd=Math.max(song.loopStart+1,Math.min(end(),loopMarkerDrag.page*384+local));
- drawLoopMarker();$('loop-end').value=Number((song.loopEnd/96*60/song.bpm).toFixed(3));
+ drawLoopMarker();$('loop-end-bar').value=Number(((song.loopEnd??end())/384+1).toFixed(5));$('loop-end').value=Number((song.loopEnd/96*60/song.bpm).toFixed(3));
 };
 $('loop-end-marker').onpointerup=()=>{
  if(!loopMarkerDrag)return;const before=loopMarkerDrag.before;loopMarkerDrag=null;
@@ -836,3 +837,70 @@ for(const kind of ['start','end']){
  label.onpointerup=e=>marker.onpointerup(e);
  label.onpointercancel=e=>marker.onpointercancel(e);
 }
+
+
+
+$('loop-end-bar').onchange=e=>{
+ const tick=Math.round((Number(e.target.value)-1)*384);
+ if(!Number.isInteger(tick)||tick<=song.loopStart||tick>end()){status('終点は開始より後、曲末までで指定してください。',true);refreshInputs();return;}
+ edit(()=>song.loopEnd=tick);
+};
+// BEGIN CUT TRANSFORM
+function cutSongRange(source,from,to,mode){
+ const total=source.bars*384,size=to-from;
+ if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<=from||to>total||!['ripple','silence'].includes(mode))throw new Error('カット範囲が不正です。');
+ if(mode==='ripple'&&size===total)throw new Error('曲全体を詰めて削除できません。無音で残すを選んでください。');
+ const result=structuredClone(source),shift=mode==='ripple'?size:0;
+ for(const t of result.tracks)t.notes=t.notes.flatMap(n=>{
+  const finish=n.start+n.duration,parts=[];
+  if(n.start<from)parts.push({...n,duration:Math.min(finish,from)-n.start});
+  if(finish>to){const start=Math.max(n.start,to);parts.push({...n,id:parts.length?`${n.id}-cut-${from}-${to}`:n.id,start:start-shift,duration:finish-start});}
+  return parts;
+ });
+ if(mode==='ripple'){
+  result.bars=Math.max(1,Math.ceil((total-size)/384));
+  const move=t=>t<=from?t:t>=to?t-size:from;
+  result.loopStart=move(source.loopStart);
+  if(source.loopEnd!==undefined)result.loopEnd=move(source.loopEnd);
+  if(result.loopStart>=(result.loopEnd??result.bars*384)){result.loopStart=0;delete result.loopEnd;}
+ }
+ // Cuts can leave fragments that round to zero audio frames.
+ const frame=t=>Math.floor(t*(source.hz??60)*60/(source.bpm*96)+.5);
+ for(const t of result.tracks)t.notes=t.notes.filter(n=>frame(n.start+n.duration)>frame(n.start));
+ return result;
+}
+// END CUT TRANSFORM
+let cutFrom=0,cutTo=384,cutDrag=null;
+function drawCutMarkers(){
+ if(!song)return;
+ cutTo=Math.min(end(),Math.max(1,cutTo));cutFrom=Math.min(cutFrom,cutTo-1);
+ const enabled=$('cut-enabled').checked;
+ document.querySelector('.cut-label-row').hidden=!enabled;$('cut-apply').disabled=!enabled;
+ $('cut-from').value=Number((cutFrom/384+1).toFixed(5));$('cut-to').value=Number((cutTo/384+1).toFixed(5));
+ for(const kind of ['start','end']){
+  const e=$(`cut-${kind}-label`),tick=kind==='start'?cutFrom:cutTo,local=tick-page*384;
+  e.hidden=!enabled||local<0||local>384;e.style.left=(local/384*100)+'%';
+  if(e.hidden)continue;
+  const width=$('roll').getBoundingClientRect().width,x=local/384*width;
+  e.classList.toggle('edge-flip',kind==='start'?x+e.getBoundingClientRect().width>width:x<e.getBoundingClientRect().width);
+  e.style.setProperty('--stem-height',Math.max(0,$('roll').getBoundingClientRect().bottom-e.getBoundingClientRect().bottom)+'px');
+  e.setAttribute('aria-valuenow',String(tick));e.setAttribute('aria-valuemin',String(kind==='start'?0:cutFrom+1));e.setAttribute('aria-valuemax',String(kind==='start'?cutTo-1:end()));
+ }
+ // Cut controls change the vertical layout; keep loop stems aligned as well.
+ drawLoopMarker();
+}
+function setCutPoint(kind,tick){if(kind==='start')cutFrom=Math.max(0,Math.min(cutTo-1,tick));else cutTo=Math.max(cutFrom+1,Math.min(end(),tick));drawCutMarkers();}
+$('cut-enabled').onchange=()=>{if($('cut-enabled').checked){cutFrom=page*384;cutTo=Math.min(end(),cutFrom+384);}drawCutMarkers();};
+for(const [id,kind] of [['cut-from','start'],['cut-to','end']])$(id).onchange=e=>{const v=Math.round((Number(e.target.value)-1)*384);if(Number.isFinite(v))setCutPoint(kind,v);else drawCutMarkers();};
+for(const kind of ['start','end']){
+ const el=$(`cut-${kind}-label`);
+ el.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();e.stopPropagation();stop();cutDrag={kind,from:cutFrom,to:cutTo};el.setPointerCapture(e.pointerId);};
+ el.onpointermove=e=>{if(!cutDrag||cutDrag.kind!==kind)return;const r=$('roll').getBoundingClientRect(),step=e.shiftKey?1:grid;setCutPoint(kind,page*384+Math.round((e.clientX-r.left)/r.width*384/step)*step);};
+ el.onpointerup=()=>cutDrag=null;
+ el.onpointercancel=()=>{if(cutDrag){cutFrom=cutDrag.from;cutTo=cutDrag.to;cutDrag=null;drawCutMarkers();}};
+ el.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();e.stopPropagation();setCutPoint(kind,(kind==='start'?cutFrom:cutTo)+(e.key==='ArrowLeft'?-1:1)*(e.shiftKey?1:grid));};
+}
+$('cut-apply').onclick=()=>{
+ try{const result=cutSongRange(song,cutFrom,cutTo,$('cut-mode').value);edit(()=>{song=result;selected=null;editRange=null;page=Math.min(page,song.bars-1);$('cut-enabled').checked=false;});status('指定範囲をカットしました。Undoで元に戻せます。');}
+ catch(e){status(e.message,true);}
+};
