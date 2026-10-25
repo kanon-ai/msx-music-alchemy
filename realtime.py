@@ -50,7 +50,7 @@ class LiveSession:
             for t in q['tracks']:
                 for k in ('instrument','wave','opmPatch','color','name','mute'):t.pop(k,None)
                 for n in t['notes']:
-                    for k in ('pitch','velocity','portamentoFrom'):n.pop(k,None)
+                    for k in ('pitch','velocity','portamentoFrom','instrument'):n.pop(k,None)
             return q
         if structure(p)!=structure(self.song):raise ValueError('演奏中は音色・音高・音量のみ更新できます。')
         candidate=copy.deepcopy(p)

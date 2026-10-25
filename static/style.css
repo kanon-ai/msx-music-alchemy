@@ -205,3 +205,6 @@ body.sound-mode #sound-view .fm-operator{grid-template-columns:repeat(3,minmax(0
 #cut-end-label{transform:translateX(-100%);border-bottom-right-radius:0}#cut-end-label::after{right:0}
 #cut-start-label.edge-flip{transform:translateX(-100%);border-bottom-left-radius:3px;border-bottom-right-radius:0}#cut-start-label.edge-flip::after{left:auto;right:0}
 #cut-end-label.edge-flip{transform:none;border-bottom-right-radius:3px;border-bottom-left-radius:0}#cut-end-label.edge-flip::after{right:auto;left:0}
+
+/* Range controls must not inherit text-field padding. */
+#preview-volume{padding:0;border:0;background:transparent;box-shadow:none}

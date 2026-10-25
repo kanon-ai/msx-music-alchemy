@@ -43,7 +43,7 @@ def validate(song):
     p=copy.deepcopy(song)
     if p.get('format')!='msx-music-studio' or p.get('version')!=1: raise ValueError('未対応の楽曲形式です。')
     if not isinstance(p.get('title'),str) or len(p['title'])>120: raise ValueError('曲名は120文字以内です。')
-    integer(p.get('bpm'),40,300,'BPM'); integer(p.get('bars'),1,64,'小節数')
+    integer(p.get('bpm'),40,300,'BPM'); integer(p.get('bars'),1,256,'小節数')
     if p.get('ppq')!=PPQ or p.get('hz') not in (50,60): raise ValueError('PPQ=96、更新周波数=50/60Hz に対応しています。')
     if type(p.get('loop')) is not bool: raise ValueError('loop は真偽値です。')
     if type(p.get('opllRhythm',False)) is not bool: raise ValueError('opllRhythm は真偽値です。')

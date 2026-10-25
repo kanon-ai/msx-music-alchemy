@@ -14,6 +14,7 @@ import core
 import opm
 from realtime import LivePool
 from mgs import export_mgs
+from opll_kit import export_kit
 from mml import import_mml
 
 DATA=Path(os.environ.get('MSX_MUSIC_DATA',str(Path(__file__).resolve().parent/'data')))
@@ -48,7 +49,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed(): return self.reply(dict(error='Local access only'),403)
         route=urlparse(self.path).path
         if route=='/api/state': return self.reply(self.server.store.get())
-        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.10.2',token=self.server.token,patches=core.PATCH_NAMES,opmTracks=opm.tracks()))
+        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.11.0',token=self.server.token,patches=core.PATCH_NAMES,opmTracks=opm.tracks()))
         if route=='/api/new': return self.reply(core.new_song())
         if route=='/api/demo': return self.reply(core.demo_song())
         allowed={'/opm-presets.json':'opm-presets.json','/':'index.html','/app.js':'app.js','/style.css':'style.css','/live-player.js':'live-player.js','/live-worklet.js':'live-worklet.js','/live-worker.js':'live-worker.js','/track-edit.js':'track-edit.js','/track-preview.js':'track-preview.js'}
@@ -84,6 +85,7 @@ class Handler(BaseHTTPRequestHandler):
                 elif fmt=='header': result=core.header(p).encode(); kind='text/plain'
                 elif fmt=='vgm': result=core.vgm(p); kind='application/octet-stream'
                 elif fmt=='mgs': result=export_mgs(p); kind='application/octet-stream'
+                elif fmt=='opllkit': result=export_kit(p); kind='application/zip'
                 elif fmt=='bundle': result=core.bundle(p); kind='application/zip'
                 elif fmt=='wav': result=core.render(p); kind='audio/wav'
                 else: raise ValueError('未対応の出力形式です。')
