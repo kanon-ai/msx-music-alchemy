@@ -87,7 +87,7 @@ def call(name,args):
         p=core.validate(args['song']); fmt=args['format']; name=args['filename']
         import re
         if not isinstance(name,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,70}',name) or name.upper() in {'CON','PRN','AUX','NUL',*[f'COM{i}' for i in range(10)],*[f'LPT{i}' for i in range(10)]}: raise ValueError('Use a plain alphanumeric filename without extension.')
-        exporters={'json':(lambda:json.dumps(p,ensure_ascii=False,indent=2).encode(),'.msx.json'),'registers':(lambda:json.dumps(core.compile_song(p),indent=2).encode(),'.registers.json'),'header':(lambda:core.header(p).encode(),'.h'),'vgm':(lambda:core.vgm(p),'.vgm'),'mgs':(lambda:export_mgs(p),'.mgs'),'wav':(lambda:core.render(p),'.wav'),'bundle':(lambda:core.bundle(p),'.zip')}
+        exporters={'json':(lambda:json.dumps(core.compact_settings(p),ensure_ascii=False,indent=2).encode(),'.msx.json'),'registers':(lambda:json.dumps(core.compile_song(p),indent=2).encode(),'.registers.json'),'header':(lambda:core.header(p).encode(),'.h'),'vgm':(lambda:core.vgm(p),'.vgm'),'mgs':(lambda:export_mgs(p),'.mgs'),'wav':(lambda:core.render(p),'.wav'),'bundle':(lambda:core.bundle(p),'.zip')}
         if fmt not in exporters: raise ValueError('Unknown format')
         fn,ext=exporters[fmt]; data=fn(); OUTPUT.mkdir(parents=True,exist_ok=True); target=OUTPUT/(name+ext)
         with target.open('xb') as f: f.write(data)

@@ -1,5 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const app=fs.readFileSync('static/app.js','utf8');const source=app.slice(app.indexOf('async function play(){'),app.indexOf('\nfunction animate(){'));
+const app=fs.readFileSync('static/app.js','utf8');const source=app.slice(app.indexOf('async function play(range=null){'),app.indexOf('\nfunction animate(){'));
 async function test(cancel,fail){
  let resume,starts=0;const button={disabled:false};
  const ctx={playbackEnd:()=>1536,buildTrackPreview:x=>x,trackDrafts:new Map(),stopAudition(){},playing:false,renderId:0,$:()=>button,status(){},audioContext:{resume:()=>new Promise((resolve,reject)=>{resume=()=>fail?reject(Error('resume failed')):resolve();}),currentTime:0},previewBoost:0,masterGain:{gain:{cancelScheduledValues(){},setValueAtTime(){}}},LivePlayer:class{constructor(context,destination,api,token){assert.equal(token,'fresh-server-token');starts++;}setMix(){}async start(){}stop(){}},api:async(path)=>{assert.equal(path,'/api/info');return {json:async()=>({token:'fresh-server-token'})};},token:'expired-token',solo:null,song:{bpm:120},page:0,clone:x=>x,requestAnimationFrame(){},animate(){}};

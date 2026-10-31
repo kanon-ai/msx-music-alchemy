@@ -5,6 +5,13 @@ const before=JSON.stringify(p);
 let r=run(p,'a',{mode:'copy',targetId:'b',shift:24,volume:50,copyTone:true});assert.equal(r.count,2);assert.equal(r.song.tracks[1].instrument,12);assert.equal(r.song.tracks[1].notes[0].velocity,5);assert.equal(r.song.tracks[1].notes[0].start,24);assert.notEqual(r.song.tracks[1].notes[0].id,'a');assert.equal(JSON.stringify(p),before);
 r=run(p,'a',{mode:'move',from:96,to:120,shift:24,transpose:2,volume:100});assert.equal(r.count,1);assert.equal(r.song.tracks[0].notes[1].start,120);assert.equal(r.song.tracks[0].notes[1].pitch,66);assert.equal(r.song.tracks[0].notes[0].start,0);
 assert.throws(()=>run(p,'a',{mode:'move',from:96,to:120,shift:-96}));assert.throws(()=>run(p,'a',{mode:'copy',targetId:'b',shift:768}));assert.throws(()=>run(p,'a',{mode:'copy',targetId:'a'}));assert.throws(()=>run(p,'a',{mode:'move',volume:0}));
-const occupied=structuredClone(p);occupied.tracks[1].notes=[{id:'other',start:400,duration:24,pitch:50,velocity:5}];assert.throws(()=>run(occupied,'a',{mode:'copy',targetId:'b',copyTone:true}));assert.equal(run(occupied,'a',{mode:'copy',targetId:'b'}).song.tracks[1].notes.length,3);
+const occupied=structuredClone(p);occupied.tracks[1].notes=[{id:'other',start:400,duration:24,pitch:50,velocity:5}];assert.equal(run(occupied,'a',{mode:'copy',targetId:'b',copyTone:true}).song.tracks[1].instrument,12);assert.equal(run(occupied,'a',{mode:'copy',targetId:'b'}).song.tracks[1].notes.length,2);
 const scc={bars:2,tracks:[{id:'a',chip:'SCC',channel:0,wave:[1],notes:p.tracks[0].notes},{id:'b',chip:'SCC',channel:3,wave:[0],notes:[]},{id:'c',chip:'SCC',channel:4,wave:[0],notes:[]}]};assert.throws(()=>run(scc,'a',{mode:'copy',targetId:'b',copyTone:true}));assert.equal(JSON.stringify(p),before);
 console.log('Track operations: copy/echo/range/transpose, immutability, collisions, bounds and shared-wave safety passed');
+
+for(const chip of ['PSG','SCC','OPM']){
+ const q=structuredClone(occupied);q.tracks[1].chip=chip;q.tracks[1].wave=[9];q.tracks[1].opmPatch={test:1};
+ const a=JSON.stringify(q),r=run(q,'a',{mode:'copy',targetId:'b',copyTone:true});
+ assert.equal(r.song.tracks[1].notes.length,2);assert.equal(r.song.tracks[1].instrument,1);assert.deepEqual(r.song.tracks[1].wave,[9]);assert.equal(r.song.tracks[1].notes[0].portamentoFrom,undefined);assert.equal(JSON.stringify(r.song.tracks[0]),JSON.stringify(q.tracks[0]));assert.equal(JSON.stringify(q),a);
+}
+console.log('Cross-chip overwrite: source preserved, destination replaced, tone retained, expression removed PASS');

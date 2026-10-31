@@ -84,11 +84,12 @@ def build_blocks(p,frame,end,loop,order):
         b=Track(loop,default,grid=grid);octave=volume=patch=lfo=last_lfo=None;detune=0
         if chip=='OPLL':b.state.update(detune=bytes([0x50,0]),**{'lfo-enable':bytes([0x5a,0])})
         if chip=='SCC':b.add(0x80+next(i for i in range(ch+1) if tracks['SCC',i]['wave']==t['wave']))
+        inst=t['instrument']
         for n in notes:
             start,stop=n['start'],n['start']+n['duration']
             b.wait(12,start-b.cursor)
             if chip=='OPLL':
-                inst=n.get('instrument',t['instrument']);new=inst-1 if inst else 15
+                inst=n.get('instrument',inst);new=inst-1 if inst else 15
                 if new!=patch:b.add(0x80+new);patch=new
             octv=n['pitch']//12-2+(chip=='OPLL')
             has_glide=n.get('portamentoMs',0)>0 and n.get('portamentoFrom',n['pitch'])!=n['pitch']

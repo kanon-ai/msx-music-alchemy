@@ -52,6 +52,19 @@ class IntegrationTests(unittest.TestCase):
         p=core.demo_song();p['hz']=50
         with self.assertRaises(HTTPError) as caught:self.request('/api/export',dict(song=p,format='mgs'))
         self.assertEqual(caught.exception.code,400)
+    def test_light_opll_export_and_error(self):
+        p=core.new_song();p.update(loop=False,bars=1)
+        with self.request('/api/state') as r: before=json.load(r)
+        with self.request('/api/export',dict(song=p,format='opllkit')) as r:
+            self.assertEqual(r.headers['Content-Type'],'application/zip')
+            self.assertTrue(r.read().startswith(b'PK'))
+        p['loop']=True
+        with self.assertRaises(HTTPError) as caught:
+            self.request('/api/export',dict(song=p,format='opllkit'))
+        self.assertEqual(caught.exception.code,400)
+        self.assertIn('ループ',json.load(caught.exception)['error'])
+        with self.request('/api/state') as r:self.assertEqual(before,json.load(r))
+
     def test_live_endpoints_and_authorization(self):
         song=core.demo_song()
         with self.assertRaises(HTTPError) as caught:

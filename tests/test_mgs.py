@@ -71,7 +71,7 @@ class MGSTests(unittest.TestCase):
         p=core.new_song();p['hz']=50
         with self.assertRaisesRegex(ValueError,'60 Hz'):mgs.export_mgs(p)
         p['hz']=60;p['tracks'][0]['notes']=[dict(id='a',pitch=60,start=0,duration=1,velocity=10)]
-        with self.assertRaises(ValueError):mgs.export_mgs(p)
+        self.assertIsInstance(mgs.export_mgs(p),bytes)  # Sub-frame notes no longer abort playback/export.
         p.update(bars=64,bpm=300,loop=False)
         for t in p['tracks']:
             t['notes']=[dict(id=str(i),pitch=48+i%36,start=i*20,duration=10,velocity=1+i%15) for i in range(900)]

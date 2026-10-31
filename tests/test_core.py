@@ -59,7 +59,7 @@ class ModelTests(unittest.TestCase):
         freq=3579545/32/((regs[0x80]|regs[0x81]<<8)+1);self.assertLess(abs(freq-440),2)
     def test_too_short_and_loop_quantization(self):
         p,t=single();p['bpm']=300;t['notes'][0]['duration']=1
-        with self.assertRaises(ValueError):core.compile_song(p)
+        self.assertEqual(len(core.compile_song(p)['warnings']),1)
         p=core.new_song();p.update(bars=1,bpm=300,loopStart=383)
         with self.assertRaises(ValueError):core.compile_song(p)
     def test_pal_timing_and_retrigger_order(self):

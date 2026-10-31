@@ -30,7 +30,7 @@ class Store:
         with LOCK:
             if revision!=self.revision: raise Conflict('他の画面またはAIによる更新があります。最新の楽曲を取得してください。')
             DATA.mkdir(parents=True,exist_ok=True)
-            temp=DATA/'autosave.tmp'; temp.write_text(json.dumps(valid,ensure_ascii=False),encoding='utf-8'); temp.replace(DATA/'autosave.json')
+            temp=DATA/'autosave.tmp'; temp.write_text(json.dumps(core.compact_settings(valid),ensure_ascii=False),encoding='utf-8'); temp.replace(DATA/'autosave.json')
             self.song=valid; self.revision+=1
             return self.get()
 class Conflict(ValueError): pass
@@ -49,7 +49,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed(): return self.reply(dict(error='Local access only'),403)
         route=urlparse(self.path).path
         if route=='/api/state': return self.reply(self.server.store.get())
-        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.11.0',token=self.server.token,patches=core.PATCH_NAMES,opmTracks=opm.tracks()))
+        if route=='/api/info': return self.reply(dict(app='msx-music-studio',version='0.12.0',token=self.server.token,patches=core.PATCH_NAMES,opmTracks=opm.tracks()))
         if route=='/api/new': return self.reply(core.new_song())
         if route=='/api/demo': return self.reply(core.demo_song())
         allowed={'/opm-presets.json':'opm-presets.json','/':'index.html','/app.js':'app.js','/style.css':'style.css','/live-player.js':'live-player.js','/live-worklet.js':'live-worklet.js','/live-worker.js':'live-worker.js','/track-edit.js':'track-edit.js','/track-preview.js':'track-preview.js'}
@@ -80,7 +80,7 @@ class Handler(BaseHTTPRequestHandler):
             if route=='/api/render': return self.reply(core.render(body['song']),kind='audio/wav')
             if route=='/api/export':
                 p=core.validate(body['song']); fmt=body['format']
-                if fmt=='json': result=json.dumps(p,ensure_ascii=False,indent=2).encode(); kind='application/json'
+                if fmt=='json': result=json.dumps(core.compact_settings(p),ensure_ascii=False,indent=2).encode(); kind='application/json'
                 elif fmt=='registers': result=json.dumps(core.compile_song(p),indent=2).encode(); kind='application/json'
                 elif fmt=='header': result=core.header(p).encode(); kind='text/plain'
                 elif fmt=='vgm': result=core.vgm(p); kind='application/octet-stream'

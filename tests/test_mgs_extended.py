@@ -44,14 +44,14 @@ class ExtendedMGS(unittest.TestCase):
         p=core.new_song();p.update(loop=False,bpm=79,bars=4,opllRhythm=True)
         return p
 
-    def test_patch_override_restores_and_all_tracks_end(self):
+    def test_patch_change_persists_and_all_tracks_end(self):
         p=self.song();t=p['tracks'][3];t['instrument']=1
         t['notes']=[dict(id='a',pitch=60,start=0,duration=24,velocity=8,instrument=12),
                     dict(id='b',pitch=64,start=48,duration=24,velocity=6)]
         before=copy.deepcopy(p);blob=mgs.export_mgs(p)
         self.assertEqual(p,before)
         notes=[e for e in decode_track(blob,8)[0] if e[2]!=12]
-        self.assertEqual([(e[0],e[2],e[4],e[5]) for e in notes],[(0,0,8,11),(48,4,6,0)])
+        self.assertEqual([(e[0],e[2],e[4],e[5]) for e in notes],[(0,0,8,11),(48,4,6,11)])
         for tr in range(15):self.assertEqual(decode_track(blob,tr)[1],1536)
 
     def test_long_rhythm_gap_does_not_retrigger(self):

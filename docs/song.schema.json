@@ -126,8 +126,7 @@
                 "id",
                 "pitch",
                 "start",
-                "duration",
-                "velocity"
+                "duration"
               ],
               "properties": {
                 "id": {
@@ -341,6 +340,10 @@
       "minimum": 1,
       "maximum": 24576,
       "description": "Optional exclusive loop end in PPQ ticks; active only when loop is true. Notes remain stored."
+    },
+    "settingsMode": {
+      "const": "changes",
+      "description": "Omitted note velocities inherit the preceding note in time order; the first note requires velocity."
     }
   },
   "allOf": [
@@ -368,6 +371,54 @@
           "tracks": {
             "minItems": 17,
             "maxItems": 17
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "settingsMode"
+        ],
+        "properties": {
+          "settingsMode": {
+            "const": "changes"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tracks": {
+            "items": {
+              "properties": {
+                "notes": {
+                  "prefixItems": [
+                    {
+                      "required": [
+                        "velocity"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "tracks": {
+            "items": {
+              "properties": {
+                "notes": {
+                  "items": {
+                    "required": [
+                      "velocity"
+                    ]
+                  }
+                }
+              }
+            }
           }
         }
       }

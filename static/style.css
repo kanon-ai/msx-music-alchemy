@@ -208,3 +208,100 @@ body.sound-mode #sound-view .fm-operator{grid-template-columns:repeat(3,minmax(0
 
 /* Range controls must not inherit text-field padding. */
 #preview-volume{padding:0;border:0;background:transparent;box-shadow:none}
+
+#roll-tone-changes{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 8px;background:#19252e;color:#b9d9ef;font-size:10px;border-bottom:1px solid #415563}#roll-tone-changes button{padding:3px 6px;font-size:10px}#notes .note.tone-change{border-left:3px solid #fff1a4}
+
+/* Share the existing controller area: 50px tone lane + 50px velocity lane. */
+#roll-tone-changes{display:block;position:relative;height:50px;min-height:50px;margin-left:44px;margin-right:18px;padding:0;overflow:hidden;background:#171f26;border-bottom:1px solid #35434f}
+#roll-tone-changes .tone-lane-caption{position:absolute;top:3px;left:4px;font:8px LocalMono,monospace;color:#8c9da9;pointer-events:none}
+#roll-tone-changes button{position:absolute;top:20px;height:25px;padding:2px 5px;border-left:2px solid #f2d886;border-radius:0 3px 3px 0;font-size:10px;overflow:hidden;text-overflow:ellipsis;text-align:left;z-index:1}
+#roll-tone-changes button:hover,#roll-tone-changes button:focus-visible{z-index:3;background:#3a4e5e}
+#velocities{height:50px;min-height:50px}
+
+/* Compact functional groups; preserve the piano's 16px pitch geometry. */
+body:not(.sound-mode) .instrument-shell{margin:8px;padding:12px}
+body:not(.sound-mode) header{min-height:0;padding:0 0 10px;margin-bottom:0;gap:12px}
+body:not(.sound-mode) header h1{font-size:24px;line-height:1.1;margin:0}
+body:not(.sound-mode) header .brand p{margin:4px 0 0}
+body:not(.sound-mode) .header-actions button{padding:6px 10px}
+body:not(.sound-mode) .transport{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:10px 0;margin:0;min-height:0}
+body:not(.sound-mode) .song-meta{width:220px;flex:0 1 220px;padding:7px 10px}
+body:not(.sound-mode) .playback{gap:5px}
+body:not(.sound-mode) .playback button{padding:8px 12px;min-width:38px;height:38px}
+body:not(.sound-mode) #time{padding:8px;font-size:18px}
+body:not(.sound-mode) .master-control{width:105px}
+.audition-controls{display:flex;align-items:end;gap:7px;margin-left:auto;padding-left:14px;border-left:1px solid #43505a}
+.audition-controls label{font-size:10px;gap:3px}.audition-controls input{width:58px;padding:4px 6px}.audition-controls button{padding:6px 9px}
+body:not(.sound-mode) .transport-fields{flex:1 0 100%;display:flex;align-items:end;justify-content:flex-start;flex-wrap:wrap;gap:7px 12px;margin:0;padding:6px 0 0;border-top:1px solid #35414a}
+body:not(.sound-mode) .transport-fields label{font-size:10px;gap:3px}
+body:not(.sound-mode) .transport-fields input,body:not(.sound-mode) .transport-fields select{padding:4px 6px}
+body:not(.sound-mode) .transport-fields button{padding:5px 9px}
+body:not(.sound-mode) main{padding:10px 0 0;gap:12px;grid-template-columns:175px minmax(440px,1fr) 190px}
+body:not(.sound-mode) .editor-top{min-height:0;padding:0 0 7px;gap:6px;margin:0}
+body:not(.sound-mode) .editor-top h2{font-size:16px;margin:2px 0 0}
+body:not(.sound-mode) .editor-top .eyebrow{display:none}
+body:not(.sound-mode) .editor-top button{padding:5px 8px}
+body:not(.sound-mode) .arrangement{padding:7px 10px;margin-bottom:6px}
+body:not(.sound-mode) .section-title{margin-bottom:8px}
+body:not(.sound-mode) .editor-tools{padding:5px 0;gap:7px;flex-wrap:wrap}
+body:not(.sound-mode) .editor-tools label{gap:2px;font-size:10px}
+body:not(.sound-mode) .editor-tools input,body:not(.sound-mode) .editor-tools select{padding:4px 6px}
+body:not(.sound-mode) .editor-tools button{display:inline-block;padding:5px 7px}
+body:not(.sound-mode) .tracks,body:not(.sound-mode) .inspector{padding:12px 10px}
+body:not(.sound-mode) .editor-footer{padding:5px 0}
+@media(max-width:1050px){body:not(.sound-mode) main{grid-template-columns:150px minmax(420px,1fr)}body:not(.sound-mode) .inspector{display:none}.audition-controls{margin-left:0}}
+
+body:not(.sound-mode) header{height:48px}
+body:not(.sound-mode) .song-meta{min-height:0;height:48px}
+body:not(.sound-mode) .transport label{gap:2px}
+body:not(.sound-mode) .transport-fields{padding-top:3px}
+body:not(.sound-mode) .editor-top{height:34px}
+body:not(.sound-mode) .arrangement{height:auto}
+body:not(.sound-mode) .arrangement .section-title{margin:0 0 5px;padding:0;line-height:12px}
+body:not(.sound-mode) #overview{padding:0 0 4px;min-height:0;gap:4px}
+body:not(.sound-mode) #overview button{height:25px;min-height:0;padding:3px 5px}
+body:not(.sound-mode) .editor-tools{min-height:0;height:auto;align-items:end}
+body:not(.sound-mode) .cut-controls{padding:4px;gap:5px;align-items:end}
+body:not(.sound-mode) .cut-controls input,body:not(.sound-mode) .cut-controls select,body:not(.sound-mode) .cut-controls button{padding:3px 5px}
+body:not(.sound-mode) .cut-controls>span{display:none}
+body:not(.sound-mode) .tracks .section-title,body:not(.sound-mode) .inspector .section-title{padding:0;margin:0 0 8px}
+body:not(.sound-mode) .song-meta{height:auto;min-height:58px}body:not(.sound-mode) .song-meta #title{padding:2px 0;line-height:22px;height:26px}
+
+/* Keep full-song and range playback adjacent as one control group. */
+.transport-play-group{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.transport-play-group .audition-controls{margin-left:0;padding-left:10px;flex-shrink:0}
+body:not(.sound-mode) .transport>.master-control{margin-left:8px}
+@media(max-width:1050px){.transport-play-group{gap:7px}.transport-play-group .audition-controls{padding-left:7px}}
+
+/* Use header space for the project; transport settings share available width. */
+body:not(.sound-mode) header{height:auto;min-height:50px;display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+body:not(.sound-mode) header .brand{flex:0 0 auto}
+body:not(.sound-mode) header .song-meta{flex:1 1 190px;width:220px;max-width:280px;min-height:42px;padding:3px 8px;margin:0 8px}
+body:not(.sound-mode) header .song-meta label{font-size:8px}
+body:not(.sound-mode) header .header-actions{margin-left:auto;gap:5px}
+body:not(.sound-mode) .transport{gap:8px 14px}
+body:not(.sound-mode) .transport-fields{flex:1 1 520px;gap:5px 8px;justify-content:flex-end;border-top:0;padding:0}
+body:not(.sound-mode) .transport-fields input[type=number]{width:55px}
+body:not(.sound-mode) .transport>.master-control{width:88px;margin-left:0}
+body:not(.sound-mode) .editor-top{justify-content:flex-start}
+body:not(.sound-mode) .editor-top>div:first-child{flex:0 1 auto;max-width:45%;margin-right:12px;min-width:0}
+body:not(.sound-mode) .editor-top h2{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body:not(.sound-mode) .editor-top .segmented{margin-left:0}
+/* Numbers occupy the upper line, activity indicators the bottom line. */
+body:not(.sound-mode) #overview{height:43px;margin-top:0;padding-bottom:5px}
+body:not(.sound-mode) #overview button{height:29px;padding:2px 5px 11px;line-height:14px;font-size:10px;color:#bdd2e3}
+body:not(.sound-mode) #overview button i{height:2px;bottom:4px;left:5px;right:5px;width:auto;pointer-events:none}
+@media(max-width:1250px){body:not(.sound-mode) .transport-fields{justify-content:flex-start}body:not(.sound-mode) header .song-meta{max-width:230px}}
+
+body:not(.sound-mode) .transport-fields .check{align-self:center;white-space:nowrap}body:not(.sound-mode) .transport-fields input[type=checkbox]{width:13px;height:13px;padding:0}
+
+/* Keep the common inspector fields visible; advanced note editing is opt-in. */
+.inspector-details{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.inspector-details>summary{cursor:pointer;color:var(--muted);font-size:11px;padding:5px 0}
+.inspector-details[open]>summary{margin-bottom:12px}
+.inspector-details .inspector-bottom{margin-top:18px}
+
+/* Inherited settings remain editable, but only changes are visible at rest. */
+#step-table .setting-inherited input,#step-table .setting-inherited select{opacity:0}
+#step-table .setting-inherited:focus-within input,#step-table .setting-inherited:focus-within select{opacity:1}
+#step-table .setting-inherited{cursor:pointer}

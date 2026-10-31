@@ -41,6 +41,8 @@ def integer(value, low, high, label):
 def validate(song):
     if not isinstance(song,dict): raise ValueError('楽曲はJSONオブジェクトで指定してください。')
     p=copy.deepcopy(song)
+    sparse=p.pop('settingsMode',None)
+    if sparse not in (None,'changes'): raise ValueError('未対応の設定形式です。')
     if p.get('format')!='msx-music-studio' or p.get('version')!=1: raise ValueError('未対応の楽曲形式です。')
     if not isinstance(p.get('title'),str) or len(p['title'])>120: raise ValueError('曲名は120文字以内です。')
     integer(p.get('bpm'),40,300,'BPM'); integer(p.get('bars'),1,256,'小節数')
@@ -83,11 +85,13 @@ def validate(song):
         if not isinstance(t.get('notes'),list): raise ValueError('notes は配列です。')
         total+=len(t['notes'])
         if total>16000: raise ValueError('最大16000音までです。')
-        last=0; noteids=set()
+        last=0; noteids=set(); inherited_velocity=None
         for n in sorted(t['notes'],key=lambda n: n.get('start',-1) if isinstance(n,dict) else -1):
             if not isinstance(n,dict): raise ValueError('ノートはオブジェクトです。')
             integer(n.get('start'),0,end-1,'開始tick'); integer(n.get('duration'),1,end,'音長tick')
+            if sparse=='changes' and 'velocity' not in n: n['velocity']=inherited_velocity
             integer(n.get('pitch'),24,95,'MIDI音程'); integer(n.get('velocity'),1,15,'音量')
+            inherited_velocity=n['velocity']
             for key,lo,hi in [('detuneCents',-100,100),('vibratoDepth',0,100),('vibratoRate',1,100),('vibratoDelayMs',0,2000),('portamentoMs',0,2000),('portamentoFrom',24,95)]:
                 if key in n:
                     integer(n[key],lo,hi,key)
@@ -146,6 +150,11 @@ def playback_end(song):
 def playback_song(song):
     p=validate(song); limit=playback_end(p)
     for t in p['tracks']:
+        if t['chip']=='OPLL' and any('instrument' in n for n in t['notes']) and not (p.get('opllRhythm') and t['channel']>=6):
+            instrument=t['instrument']
+            for n in t['notes']:
+                instrument=n.get('instrument',instrument)
+                n['instrument']=instrument  # Resolved on playback copy only.
         t['notes']=[n for n in t['notes'] if n['start']<limit]
         for n in t['notes']: n['duration']=min(n['duration'],limit-n['start'])
     return p
@@ -172,7 +181,15 @@ def compile_song(song):
     scc={t['channel']:t for t in p['tracks'] if t['chip']=='SCC'}
     for ch in range(4):
         for i,v in enumerate(scc[ch]['wave']): write(0,2,ch*32+i,v&255)
-    schedule=[]; warnings=[]
+    # Filter only the playback copy: tempo-dependent sub-frame notes remain editable.
+    warnings=[]
+    for t in p['tracks']:
+        if t['mute']: continue
+        kept=[n for n in t['notes'] if frame(n['start']+n['duration'])>frame(n['start'])]
+        skipped=len(t['notes'])-len(kept)
+        if skipped: warnings.append(f'{t["name"]}: 1フレーム未満の極短音 {skipped}音をスキップ（元データは保持）')
+        t['notes']=kept
+    schedule=[]
     for t in p['tracks']:
         if t['mute'] or t['chip']=='OPM': continue
         for n in t['notes']:
@@ -378,7 +395,7 @@ def vgm(song):
 def bundle(song):
     p=validate(song); raw,meta=binary(p); out=io.BytesIO()
     with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
-        z.writestr('song.msx.json',json.dumps(p,ensure_ascii=False,indent=2))
+        z.writestr('song.msx.json',json.dumps(compact_settings(p),ensure_ascii=False,indent=2))
         z.writestr('registers.json',json.dumps(compile_song(p),indent=2))
         z.writestr('song.bin',raw); z.writestr('song.h',header(p)); z.writestr('song.vgm',vgm(p))
         z.writestr('manifest.json',json.dumps(meta,indent=2))
@@ -407,3 +424,20 @@ def audition_song(body):
         for x in p['tracks']:
             if x['chip']=='SCC' and x['channel']>=3:x['wave']=dst['wave'][:]
     return validate(p)
+
+
+def compact_settings(song):
+    """Persist only changes; validate expands volumes for existing playback/edit code."""
+    p=validate(song)
+    for t in p['tracks']:
+        velocity=None; instrument=t['instrument']
+        for n in t['notes']:
+            current=n['velocity']
+            if current==velocity: del n['velocity']
+            velocity=current
+            if 'instrument' in n:
+                current=n['instrument']
+                if current==instrument: del n['instrument']
+                instrument=current
+    p['settingsMode']='changes'
+    return p
